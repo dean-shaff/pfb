@@ -1,5 +1,6 @@
 import logging
 import time
+import os
 
 import numpy as np
 import scipy.io
@@ -47,7 +48,9 @@ def load_dada_file(file_path, header_size=4096):
 
 
 def dump_dada_file(file_path, header, data, header_size=4096):
+    module_logger.debug(f"dump_dada_file file_path: {file_path}")
     module_logger.debug(f"dump_dada_file header: {header}")
+    module_logger.debug(f"dump_dada_file header_size: {header_size}")
     t0 = time.time()
 
     header_str = "\n".join(

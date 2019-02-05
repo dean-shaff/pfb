@@ -22,14 +22,24 @@ input_file_path = os.path.join(
 
 
 def compare_dump_files(file_path0, file_path1, **kwargs):
+    print(file_path0)
+    print(file_path1)
     comp_dat = []
     dat_sizes = np.zeros(2)
     fnames = [file_path0, file_path1]
     for i, fname in enumerate(fnames):
         header, data = load_dada_file(fname)
         comp_dat.append(data)
+        dat_sizes[i] = data.shape[0]
     min_size = int(np.amin(dat_sizes))
     comp_dat = [d[:min_size] for d in comp_dat]
+
+    # fig, axes = plt.subplots(3, 1)
+    # axes[0].plot(comp_dat[0])
+    # axes[1].plot(comp_dat[1])
+    # axes[2].plot(np.abs(np.subtract(*comp_dat)))
+    # plt.show()
+
     return np.allclose(*comp_dat, **kwargs)
 
 
@@ -42,7 +52,7 @@ class TestPFBChannelizer(unittest.TestCase):
         )
         self.channelizer = channelizer
 
-    # @unittest.skip("")
+    @unittest.skip("")
     def test_new_filter(self):
 
         g = self.channelizer._channelize(8, "1/1")
@@ -64,7 +74,7 @@ class TestPFBChannelizer(unittest.TestCase):
         axes[2].plot(np.abs(f[:, c] - lf[:, c]).real)
         plt.show()
 
-    @unittest.skip("")
+    # @unittest.skip("")
     def test_critically_sampled_pfb_vs_matlab(self):
 
         expected_file_path = os.path.join(
@@ -73,23 +83,11 @@ class TestPFBChannelizer(unittest.TestCase):
         )
         self.channelizer.channelize(8, "1/1")
 
-        # g = self.channelizer._channelize(8, "1/1")
-        # next(g)
-        # f, lf = next(g)
-        # print(np.allclose(f, lf))
-        # fig, axes = plt.subplots(3, 1)
-        # xlim = [0, 100]
-        # for ax in axes:
-        #     ax.set_xlim(xlim)
-        # axes[0].plot(f[:, 1])
-        # axes[1].plot(lf[:, 1])
-        # axes[2].plot(scipy.signal.fftconvolve(f[:, 1], np.conj(lf[:, 1]), "same"))
-        # plt.show()
         self.assertTrue(
             compare_dump_files(expected_file_path,
-                               self.channelizer.output_file_path))
+                               self.channelizer.output_file_path, atol=1e-5))
 
-    @unittest.skip("")
+    # @unittest.skip("")
     def test_over_sampled_pfb_vs_matlab(self):
 
         expected_file_path = os.path.join(
@@ -100,7 +98,7 @@ class TestPFBChannelizer(unittest.TestCase):
         self.channelizer.channelize(8, "8/7")
         self.assertTrue(
             compare_dump_files(expected_file_path,
-                               self.channelizer.output_file_path))
+                               self.channelizer.output_file_path, atol=1e-5))
 
 
 if __name__ == '__main__' :

@@ -8,7 +8,12 @@ import scipy.signal
 import matplotlib.pyplot as plt
 import numba
 
-from .util import load_dada_file, dump_dada_file, load_matlab_filter_coef
+from .util import (
+    load_dada_file,
+    dump_dada_file,
+    load_matlab_filter_coef,
+    get_most_recent_data_file
+)
 from .rational import Rational
 
 module_logger = logging.getLogger(__name__)
@@ -241,9 +246,176 @@ class PFBChannelizer:
 
         dump_dada_file(self.output_file_path, header, data)
 
-    def _channelize(self, nchan, oversampling_factor, output_file_path=None):
+    def _spiral_roll(self, arr, n=None):
+        """
+        Cyclically shift arr by n
+        """
+        if n is None:
+            n = arr.shape[1]
+        for i in range(n):
+            arr[i::n, :] = np.roll(
+                arr[i::n, :],
+                i % n,
+                axis=1
+            )
+        return arr
+
+    def _channelize_fft(self,
+                        input_samples,
+                        input_samples_per_pol_dim,
+                        output_samples_per_pol_dim):
+
+        nchan = self._output_nchan
+
+        output_filtered = np.zeros(
+            (output_samples_per_pol_dim, nchan),
+            dtype=input_samples.dtype
+        )
+
+        nchan_norm = self.oversampling_factor.normalize(nchan)
+        for p in range(self._input_npol):
+            p_idx = self._output_ndim * p
+            t0 = time.time()
+
+            # input_samples_padded = np.append(
+            #     np.zeros(nchan_norm, dtype=self._float_dtype),
+            #     input_samples[:, p][::-1]
+            # )
+
+            input_samples_padded = np.append(
+                np.zeros(
+                    int(self._fir_filter_coef.shape[0]),
+                    dtype=self._float_dtype
+                ),
+                np.conj(input_samples[:, p])[::-1]
+            )
+            # input_samples_padded = input_samples[:, p][::-1]
+            t0 = time.time()
+            for c in range(nchan):
+                filter_decimated = self._fir_filter_coef[c::nchan]
+                if c == 0:
+                    input_decimated = input_samples_padded[::nchan_norm]
+                    filtered = scipy.signal.fftconvolve(
+                        input_decimated, filter_decimated, "full")
+                    # filtered = scipy.signal.lfilter(
+                    #     filter_decimated, [1.0], input_decimated)
+                    filtered = np.append(filtered, 0)
+                else:
+                    # input_decimated = input_samples_padded[(nchan-c+1)::nchan]
+                    input_decimated = input_samples_padded[c::nchan_norm]
+                    filtered = scipy.signal.fftconvolve(
+                        input_decimated, filter_decimated, "full")
+                    # filtered = scipy.signal.lfilter(
+                    #     filter_decimated, [1.0], input_decimated)
+                    filtered = np.insert(filtered, 0, 0)
+                input_decimated = input_samples_padded[c::nchan_norm]
+                filtered = scipy.signal.fftconvolve(
+                    input_decimated, filter_decimated, "full")
+
+                if self._input_ndim == 2:
+                    filtered_real = scipy.signal.lfilter(
+                        filter_decimated, 1.0, np.real(input_decimated)
+                    ).astype(self._float_dtype)
+                    filtered_imag = scipy.signal.lfilter(
+                        filter_decimated, 1.0, np.imag(input_decimated)
+                    ).astype(self._float_dtype)
+                    output_filtered[:output_samples_per_pol_dim, c] = \
+                        filtered_real[:output_samples_per_pol_dim] + \
+                        1j*filtered_imag[:output_samples_per_pol_dim]
+                else:
+                    filtered = scipy.signal.lfilter(
+                        filter_decimated, 1.0, input_decimated
+                    ).astype(self._float_dtype)
+                    output_filtered[:output_samples_per_pol_dim, c] = \
+                        filtered[:output_samples_per_pol_dim]
+
+                filtered = np.convolve(input_decimated, filter_decimated)
+                delta = filtered.shape[0] - output_samples_per_pol_dim
+                delta_2 = int(delta/2)
+                output_filtered[:output_samples_per_pol_dim, c] = \
+                    filtered[delta_2:output_samples_per_pol_dim + delta_2]
+
+            self.logger.debug(
+                (f"_channelize_fft: Calls to scipy.signal.fftconvolve "
+                 f"took {time.time()-t0:.4f} seconds"))
+
+            if self.oversampled:
+                t0 = time.time
+                output_filtered = self._spiral_roll(output_filtered, nchan)
+                self.logger.debug(
+                    (f"_channelize_fft: "
+                     f"Shifting array took {time.time()-t0:.4f} seconds"))
+
+            yield output_filtered
+
+            output_filtered_fft = (nchan**2)*np.fft.ifft(
+                output_filtered, n=nchan, axis=1)
+
+            self.output_data[:, :, p_idx] = np.real(output_filtered_fft)
+            self.output_data[:, :, p_idx+1] = np.imag(output_filtered_fft)
+
+    def _channelize(self,
+                    input_samples,
+                    input_samples_per_pol_dim,
+                    output_samples_per_pol_dim):
+
         t_total = time.time()
 
+        nchan = self._output_nchan
+
+        output_filtered = np.zeros(
+            (output_samples_per_pol_dim, nchan),
+            dtype=input_samples.dtype
+        )
+
+        # output_filtered = output_filtered.copy()
+
+        nchan_norm = self.oversampling_factor.normalize(nchan)
+
+        for p in range(self._input_npol):
+            p_idx = self._output_ndim * p
+            t0 = time.time()
+
+            output_filtered = filter(
+                input_samples[:, p].copy(),
+                self._fir_filter_coef,
+                output_filtered,
+                nchan,
+                nchan_norm
+            )
+
+            self.logger.debug(
+                (f"_channelize: "
+                 f"Call to filter took {time.time()-t0:.4f} seconds"))
+
+            if self.oversampled:
+                t0 = time.time()
+                output_filtered = self._spiral_roll(output_filtered, nchan)
+
+                self.logger.debug(
+                    (f"_channelize: "
+                     f"Shifting array took {time.time()-t0:.4f} seconds"))
+
+            yield output_filtered
+
+            output_filtered_fft = (nchan**2)*np.fft.ifft(
+                output_filtered, n=nchan, axis=1)
+
+            self.output_data[:, :, p_idx] = np.real(output_filtered_fft)
+            self.output_data[:, :, p_idx+1] = np.imag(output_filtered_fft)
+
+        self.logger.debug(
+            (f"_channelize: "
+             f"Took {time.time() - t_total:.4f} seconds to channelize"))
+
+    def _prepare_channelize(self,
+                            nchan,
+                            oversampling_factor,
+                            output_file_path=None):
+        """
+        Do any operations necessary to prepare input and output data structures
+        for channelization
+        """
         self._output_nchan = nchan
 
         if hasattr(oversampling_factor, "endswith"):
@@ -306,139 +478,37 @@ class PFBChannelizer:
         if int(self._ndim_ratio) != 1:
             input_samples = input_samples[::int(self._ndim_ratio), :]
 
-        nchan = self._output_nchan
+        return (input_samples,
+                input_samples_per_pol_dim,
+                output_samples_per_pol_dim)
 
-        yield
-
-        output_filtered = np.zeros(
-            (output_samples_per_pol_dim, nchan),
-            dtype=input_samples.dtype
-        )
-        output_filtered_lfilter = output_filtered.copy()
-
-        nchan_norm = self.oversampling_factor.normalize(nchan)
-
-        for p in range(self._input_npol):
-            p_idx = self._output_ndim * p
-            t0 = time.time()
-
-            output_filtered = filter(
-                input_samples[:, p].copy(),
-                self._fir_filter_coef,
-                # np.append(self._fir_filter_coef, np.zeros(5, dtype=self._float_dtype)),
-                output_filtered,
-                nchan,
-                nchan_norm
-            )
-
-            self.logger.debug(
-                (f"channelize: "
-                 f"Call to filter took {time.time()-t0:.4f} seconds"))
-
-            # input_samples_padded = np.append(
-            #     np.zeros(nchan_norm, dtype=self._float_dtype),
-            #     input_samples[:, p][::-1]
-            # )
-            input_samples_padded = np.append(
-                np.zeros(int(self._fir_filter_coef.shape[0]), dtype=self._float_dtype),
-                np.conj(input_samples[:, p])[::-1]
-            )
-            # input_samples_padded = input_samples[:, p][::-1]
-            t0 = time.time()
-            for c in range(nchan):
-                filter_decimated = self._fir_filter_coef[c::nchan]
-                # if c == 0:
-                #     input_decimated = input_samples_padded[::nchan_norm]
-                #     filtered = scipy.signal.fftconvolve(input_decimated, filter_decimated, "full")
-                #     # filtered = scipy.signal.lfilter(
-                #     #     filter_decimated, [1.0], input_decimated)
-                #     filtered = np.append(filtered, 0)
-                # else:
-                #     # input_decimated = input_samples_padded[(nchan-c+1)::nchan]
-                #     input_decimated = input_samples_padded[c::nchan_norm]
-                #     filtered = scipy.signal.fftconvolve(input_decimated, filter_decimated, "full")
-                #     # filtered = scipy.signal.lfilter(
-                #     #     filter_decimated, [1.0], input_decimated)
-                #     filtered = np.insert(filtered, 0, 0)
-                input_decimated = input_samples_padded[c::nchan_norm]
-                filtered = scipy.signal.fftconvolve(input_decimated, filter_decimated, "full")
-                # print(filter_decimated.shape)
-                # print(input_decimated.shape)
-                # print(filtered.shape)
-                # print(output_samples_per_pol_dim)
-                # if self._input_ndim == 2:
-                #     filtered_real = scipy.signal.lfilter(
-                #         filter_decimated, 1.0, np.real(input_decimated)
-                #     ).astype(self._float_dtype)
-                #     print(filtered_real.shape, output_samples_per_pol_dim)
-                #     filtered_imag = scipy.signal.lfilter(
-                #         filter_decimated, 1.0, np.imag(input_decimated)
-                #     ).astype(self._float_dtype)
-                #     output_filtered_lfilter[:output_samples_per_pol_dim, c] = \
-                #         filtered_real[:output_samples_per_pol_dim] + \
-                #         1j*filtered_imag[:output_samples_per_pol_dim]
-                # else:
-                #     filtered = scipy.signal.lfilter(
-                #         filter_decimated, 1.0, input_decimated
-                #     ).astype(self._float_dtype)
-                #     output_filtered_lfilter[:output_samples_per_pol_dim, c] = \
-                #         filtered[:output_samples_per_pol_dim]
-
-                # filtered = np.convolve(input_decimated, filter_decimated)
-                delta = filtered.shape[0] - output_samples_per_pol_dim
-                delta_2 = int(delta/2)
-                output_filtered_lfilter[:output_samples_per_pol_dim, c] = \
-                        filtered[delta_2:output_samples_per_pol_dim + delta_2]
-
-            self.logger.debug(f"channelize: Calls to scipy.signal.lfilter took {time.time()-t0:.4f} seconds")
-
-            if self.oversampled:
-                t0 = time.time()
-                for i in range(nchan):
-                    output_filtered[i::nchan, :] = np.roll(
-                        output_filtered[i::nchan, :],
-                        i % nchan,
-                        axis=1
-                    )
-                    output_filtered_lfilter[i::nchan, :] = np.roll(
-                        output_filtered_lfilter[i::nchan, :],
-                        i % nchan,
-                        axis=1
-                    )
-
-                self.logger.debug(
-                    (f"channelize: "
-                     f"Shifting array took {time.time()-t0:.4f} seconds"))
-
-            yield output_filtered, output_filtered_lfilter
-
-            output_filtered_fft = (nchan**2)*np.fft.ifft(
-                output_filtered, n=nchan, axis=1)
-
-            self.output_data[:, :, p_idx] = np.real(output_filtered_fft)
-            self.output_data[:, :, p_idx+1] = np.imag(output_filtered_fft)
-
-        self._dump_data(self.output_header, self.output_data)
-        self.logger.debug(
-            (f"channelize: "
-             f"Took {time.time() - t_total:.4f} seconds to channelize"))
 
     def channelize(self, *args, **kwargs):
-        for i in self._channelize(*args, **kwargs):
+        prepped = self._prepare_channelize(*args, **kwargs)
+        for i in self._channelize(*prepped):
             pass
+        self._dump_data(self.output_header, self.output_data)
 
 
 def create_parser():
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    config_dir = os.path.join(current_dir, "config")
-    data_dir = os.path.join(current_dir, "data")
+
+    config_dir = os.getenv("PFB_CONFIG_DIR",
+                           os.path.join(current_dir, "config"))
+    data_dir = os.getenv("PFB_DATA_DIR",
+                         os.path.join(current_dir, "data"))
 
     parser = argparse.ArgumentParser(
-        description="_channelize_slow_filter simulated pulsar data")
+        description="channelize data")
 
     parser.add_argument("-i", "--input-file",
                         dest="input_file_path",
                         default=get_most_recent_data_file(data_dir))
+
+    parser.add_argument("-f", "--fir-file",
+                        dest="fir_file_path",
+                        default=os.path.join(config_dir,
+                                             "OS_Prototype_FIR_8.mat"))
 
     parser.add_argument("-v", "--verbose",
                         dest="verbose", action="store_true")
@@ -449,9 +519,6 @@ def create_parser():
     parser.add_argument("-os", "--oversampling_factor",
                         dest="oversampling_factor", default="1/1", type=str)
 
-    # parser.add_argument("--compare",
-    #                     dest="compare", default="", type=str)
-    #
     return parser
 
 
@@ -464,20 +531,9 @@ if __name__ == "__main__":
     logging.basicConfig(level=log_level)
     logging.getLogger("matplotlib").setLevel(logging.ERROR)
 
-    nu, de = [int(s) for s in parsed.oversampling_factor.split("/")]
-    os = Rational(nu, de)
-
     channelizer = PFBChannelizer(
-        parsed.input_file_path, os
+        parsed.input_file_path,
+        parsed.fir_file_path
     )
 
-    channelizer.channelize()
-    # channelizer.channelize_conv()
-
-    # if parsed.compare != "":
-    #     compare_dump_files(
-    #         channelizer.output_file_path,
-    #         parsed.compare,
-    #         rtol=1e-6,
-    #         atol=1e-6
-    #     )
+    channelizer.channelize(parsed.channels, parsed.oversampling_factor)
