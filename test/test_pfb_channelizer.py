@@ -17,13 +17,14 @@ from src.util import load_dada_file
 
 fir_file_path = os.path.join(
     current_dir, "OS_Prototype_FIR_8.mat")
+
 input_file_path = os.path.join(
     data_dir, "impulse.noise_0.0.nseries_3.ndim_2.dump")
+# input_file_path = os.path.join(
+#     data_dir, "simulated_pulsar.noise_0.0.nseries_3.ndim_2.dump")
 
 
 def compare_dump_files(file_path0, file_path1, **kwargs):
-    print(file_path0)
-    print(file_path1)
     comp_dat = []
     dat_sizes = np.zeros(2)
     fnames = [file_path0, file_path1]
@@ -52,29 +53,34 @@ class TestPFBChannelizer(unittest.TestCase):
         )
         self.channelizer = channelizer
 
-    @unittest.skip("")
+    # @unittest.skip("")
     def test_new_filter(self):
+        nchan = 8
+        prepped = self.channelizer._prepare_channelize(nchan, "1/1")
+        g0 = self.channelizer._channelize(*prepped)
+        g1 = self.channelizer._channelize_fft(*prepped)
+        f0, f1 = next(g0), next(g1)
+        c = 4
+        for j in range(nchan):
+            print(f"j={j}: {np.allclose(f0[:, j], f1[:, j], atol=1e-5)}")
+        print(np.allclose(f0, f1, atol=1e-5))
+        fig, axes = plt.subplots(3, nchan, figsize=(18, 10))
+        fig.tight_layout(rect=[0.05, 0.03, 1, 0.95])
+        # xlim = [2, 18]
+        for i in range(axes.shape[0]):
+            for j in range(axes.shape[1]):
+                axes[i, j].grid(True)
+                # axes[i, j].set_xlim(xlim)
 
-        g = self.channelizer._channelize(8, "1/1")
-        next(g)
-        f, lf = next(g)
-        c = 0
-        for j in range(8):
-            print(f"j={j}: {np.allclose(f[:, j], lf[:, j], atol=1e-5)}")
-        print(np.allclose(f, lf, atol=1e-5))
-        fig, axes = plt.subplots(3, 1)
-        xlim = [0, 100]
-        for ax in axes[:2]:
-            ax.grid(True)
-            ax.set_xlim(xlim)
-        axes[0].plot(f[:, c].real)
-        axes[0].plot(f[:, c].imag)
-        axes[1].plot(lf[:, c].real)
-        axes[1].plot(lf[:, c].imag)
-        axes[2].plot(np.abs(f[:, c] - lf[:, c]).real)
+        for c in range(nchan):
+            axes[0, c].plot(f0[:, c].real)
+            axes[0, c].plot(f0[:, c].imag)
+            axes[1, c].plot(f1[:, c].real)
+            axes[1, c].plot(f1[:, c].imag)
+            axes[2, c].plot(np.abs(f0[:, c] - f1[:, c]))
         plt.show()
 
-    # @unittest.skip("")
+    @unittest.skip("")
     def test_critically_sampled_pfb_vs_matlab(self):
 
         expected_file_path = os.path.join(
@@ -87,7 +93,7 @@ class TestPFBChannelizer(unittest.TestCase):
             compare_dump_files(expected_file_path,
                                self.channelizer.output_file_path, atol=1e-5))
 
-    # @unittest.skip("")
+    @unittest.skip("")
     def test_over_sampled_pfb_vs_matlab(self):
 
         expected_file_path = os.path.join(
