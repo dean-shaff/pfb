@@ -266,6 +266,7 @@ class PFBChannelizer:
                         output_samples_per_pol_dim):
         if self.oversampled:
             raise RuntimeError("_channelize_fft doesn't work in the oversampled case")
+
         nchan = self._output_nchan
 
         output_filtered = np.zeros(
@@ -273,6 +274,7 @@ class PFBChannelizer:
             dtype=input_samples.dtype
         )
         nchan_norm = self.oversampling_factor.normalize(nchan)
+
         # window_size = self._fir_filter_coef.shape[0]
         # samples_per_window = int(window_size/nchan)
         # filter_windows = int((output_samples_per_pol_dim*nchan_norm - window_size)/nchan_norm)
@@ -281,18 +283,20 @@ class PFBChannelizer:
         # for i in range(filter_windows):
         #     ii = samples_per_window*i
         #     os_idx[ii:ii+samples_per_window] = idx[i*nchan_norm:i*nchan_norm + window_size][::nchan]
-        # os_idx = np.unique(os_idx)
+        # os_idx = np.sort(np.unique(os_idx))
+
         for p in range(self._input_npol):
             p_idx = self._output_ndim * p
             t0 = time.time()
 
-            input_samples = input_samples[:output_samples_per_pol_dim*nchan_norm, p]
             input_samples_padded = np.append(
                 np.zeros(
                     int(self._fir_filter_coef.shape[0]),
                     dtype=self._float_dtype
                 ),
-                np.conj(input_samples[::-1])
+                np.conj(
+                    input_samples[:output_samples_per_pol_dim*nchan, p][::-1]
+                )
             )
             t0 = time.time()
             for c in range(nchan):
@@ -300,7 +304,7 @@ class PFBChannelizer:
 
                 input_decimated = input_samples_padded[c::nchan]
                 # if not self.oversampled:
-                #     input_decimated = input_samples_padded[c::nchan]
+                    # input_decimated = input_samples_padded[c::nchan]
                 # else:
                 #     input_decimated = input_samples_padded[os_idx + c]
                 filtered = scipy.signal.fftconvolve(
@@ -343,6 +347,8 @@ class PFBChannelizer:
 
         nchan = self._output_nchan
 
+        filter_coef_per_chan = int(self._fir_filter_coef.shape[0] / nchan)
+
         output_filtered = np.zeros(
             (output_samples_per_pol_dim, nchan),
             dtype=input_samples.dtype
@@ -364,6 +370,9 @@ class PFBChannelizer:
                 nchan_norm
             )
 
+            # output_filtered = output_filtered[filter_coef_per_chan:, :]
+            # output_filtered[:filter_coef_per_chan, :] = 0.0
+
             self.logger.debug(
                 (f"_channelize: "
                  f"Call to filter took {time.time()-t0:.4f} seconds"))
@@ -381,8 +390,16 @@ class PFBChannelizer:
             output_filtered_fft = (nchan**2)*np.fft.ifft(
                 output_filtered, n=nchan, axis=1)
 
+            # output_filtered_fft = nchan*np.fft.fft(
+            #     output_filtered, n=nchan, axis=1)
+
             self.output_data[:, :, p_idx] = np.real(output_filtered_fft)
             self.output_data[:, :, p_idx+1] = np.imag(output_filtered_fft)
+
+        # print(self.output_data.shape)
+        # self.output_data = self.output_data[int(filter_coef_per_chan/2):, :, :]
+        # self.output_header['OFFSET'] = filter_coef_per_chan * nchan * self._output_ndim * self._output_npol * np.dtype(self._float_dtype).itemsize
+        # print(self.output_data.shape)
 
         self.logger.debug(
             (f"_channelize: "
@@ -466,10 +483,10 @@ class PFBChannelizer:
     def channelize(self, *args, **kwargs):
         prepped = self._prepare_channelize(*args, **kwargs)
 
-        if not self.oversampled:
-            g = self._channelize_fft(*prepped)
-        else:
-            g = self._channelize(*prepped)
+        # if not self.oversampled:
+        #     g = self._channelize_fft(*prepped)
+        # else:
+        g = self._channelize(*prepped)
 
         for i in g:
             pass

@@ -1,22 +1,19 @@
 import os
-import sys
 import logging
 import unittest
 
 import numpy as np
-import scipy.signal
 import matplotlib.pyplot as plt
-
-current_dir = os.path.dirname(os.path.abspath(__file__))
-data_dir = os.path.join(current_dir, "test_data")
-
-sys.path.append(os.path.dirname(current_dir))
 
 from src.pfb_channelizer import PFBChannelizer
 from src.util import load_dada_file
 
+current_dir = os.path.dirname(os.path.abspath(__file__))
+data_dir = os.path.join(current_dir, "test_data")
+
+
 fir_file_path = os.path.join(
-    current_dir, "OS_Prototype_FIR_8.mat")
+    current_dir, "Prototype_FIR.mat")
 
 input_file_path = os.path.join(
     data_dir, "impulse.noise_0.0.nseries_3.ndim_2.dump")
@@ -54,9 +51,35 @@ class TestPFBChannelizer(unittest.TestCase):
         self.channelizer = channelizer
 
     # @unittest.skip("")
-    def test_new_filter(self):
+    def test_filter_response(self):
         nchan = 8
         prepped = self.channelizer._prepare_channelize(nchan, "1/1")
+        g = self.channelizer._channelize(*prepped)
+        filtered = next(g)
+        fft_size = filtered.shape[0]
+
+        fig, axes = plt.subplots(3, nchan, figsize=(18, 10))
+        fig.tight_layout(rect=[0.05, 0.03, 1, 0.95])
+        # xlim = [2, 18]
+        xlim = [0, 50]
+        for i in range(axes.shape[0]):
+            for j in range(axes.shape[1]):
+                axes[i, j].grid(True)
+                axes[0, j].set_xlim(xlim)
+        filter_coef_per_chan = self.channelizer._fir_filter_coef.shape[0] // nchan
+        for c in range(nchan):
+            axes[0, c].plot(filtered[:, c].real)
+            axes[0, c].plot(filtered[:, c].imag)
+            chan_fft = np.fft.fft(filtered[:, c][filter_coef_per_chan:fft_size+filter_coef_per_chan])
+            axes[1, c].plot(np.abs(chan_fft))
+            axes[2, c].plot(np.angle(chan_fft))
+
+        plt.show()
+
+    @unittest.skip("")
+    def test_new_filter(self):
+        nchan = 8
+        prepped = self.channelizer._prepare_channelize(nchan, "8/7")
         g0 = self.channelizer._channelize(*prepped)
         g1 = self.channelizer._channelize_fft(*prepped)
         f0, f1 = next(g0), next(g1)

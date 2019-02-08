@@ -17,4 +17,4 @@ llvmlite = "==0.27"
 python_version = "3.6"
 
 [scripts]
-test = "python test/test_pfb_channelizer.py"
+test = "python -m unittest discover"
