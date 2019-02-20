@@ -1,3 +1,4 @@
+import os
 import logging
 
 import numpy as np
@@ -39,15 +40,15 @@ class DADAFile:
         return self._data
 
     @property
-    def nchan(self)::
+    def nchan(self):
         return int(self["NCHAN"])
 
     @property
-    def ndim(self)::
+    def ndim(self):
         return int(self["NDIM"])
 
     @property
-    def npol(self)::
+    def npol(self):
         return int(self["NPOL"])
 
     @property
@@ -70,7 +71,7 @@ class DADAFile:
                              for item in ["NDIM", "NCHAN", "NPOL"]]
 
         data = data.reshape((-1, nchan, npol, ndim))
-        if ndim == 2:
+        if ndim == 2: # means we're dealing with complex data
             data = data[:, :, :, 0] + 1j*data[:, :, :, 1]
 
         return data
@@ -78,8 +79,7 @@ class DADAFile:
     def load_data(self):
 
         self._load_data_from_file()
-        self._data = self._shape_data(self._data)
-
+        self._data = self._shape_data(self._data).copy()
 
     def dump_data(self, overwrite=False):
 
@@ -95,15 +95,17 @@ class DADAFile:
                 exists = os.path.exists(temp_file_path)
             new_file_path = temp_file_path
 
-        if self.ndim = 1:
+        if self.ndim == 1:
             data = self.data.flatten()
         else:
-            data = np.zeros((self.ndat, self.nchan, self.ndim*self.npol))
+            data = np.zeros((self.ndat, self.nchan, self.ndim*self.npol),
+                            dtype=self["FLOAT_DTYPE"])
             for pol in range(self.npol):
                 data[:, :, pol*2] = self.data[:,:,pol].real
                 data[:, :, pol*2 + 1] = self.data[:,:,pol].imag
-
+        self.logger.debug(f"dump_data: new file path: {new_file_path}")
         dump_dada_file(new_file_path, self.header, data)
+        return new_file_path
 
     def __getitem__(self, item):
         if self._header is not None:

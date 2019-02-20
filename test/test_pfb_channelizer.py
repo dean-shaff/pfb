@@ -5,8 +5,8 @@ import unittest
 import numpy as np
 import matplotlib.pyplot as plt
 
-from src.pfb_channelizer import PFBChannelizer
-from src.util import load_dada_file
+from src.pfb.pfb_channelizer import PFBChannelizer
+from src.pfb.util import load_dada_file
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 data_dir = os.path.join(current_dir, "test_data")
