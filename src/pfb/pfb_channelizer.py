@@ -12,6 +12,7 @@ from .util import (
     load_dada_file,
     dump_dada_file,
     load_matlab_filter_coef,
+    add_filter_info_to_header,
     get_most_recent_data_file
 )
 from .rational import Rational
@@ -117,6 +118,17 @@ class PFBChannelizer:
 
         self._fir_config = None
         self._fir_filter_coef = None
+        self._fir_info = None
+
+    def _populate_fir_info(self, filter_coef: np.ndarray) -> None:
+
+        if self._fir_info is None:
+            self._fir_info = {}
+
+        self._fir_info["OVERSAMP"] = self.output_header["OS_FACTOR"]
+        self._fir_info["NTAP"] = len(filter_coef)
+        self._fir_info["COEFF"] = filter_coef
+        self._fir_info["NCHAN_PFB"] = self._input_nchan
 
     def _load_fir_config(self, diagnostic_plots=False, pad=True):
 
@@ -124,11 +136,14 @@ class PFBChannelizer:
         if self.fir_file_path.endswith(".mat"):
             self._fir_config, self._fir_filter_coef = load_matlab_filter_coef(
                 self.fir_file_path)
-            self._fir_filter_coef = self._fir_filter_coef.astype(self._float_dtype)
+            self._fir_filter_coef = self._fir_filter_coef.astype(
+                self._float_dtype)
         else:
             raise RuntimeError(
                 ("No support for filter coefficient "
                  "files other than matlab files"))
+
+        self._populate_fir_info(self._fir_filter_coef)
 
         if diagnostic_plots:
             plt.ion()
@@ -243,7 +258,8 @@ class PFBChannelizer:
         self.output_header['OS_FACTOR'] = f"{os_factor.nu}/{os_factor.de}"
 
     def _dump_data(self, header, data):
-
+        header = add_filter_info_to_header(
+            header, [self._fir_info])
         dump_dada_file(self.output_file_path, header, data)
 
     def _spiral_roll(self, arr, n=None):

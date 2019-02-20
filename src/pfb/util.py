@@ -1,3 +1,4 @@
+import argparse
 import logging
 import os
 import typing
@@ -88,7 +89,7 @@ def dump_dada_file(file_path: str,
              if key not in _exclude_header_keys]) + "\n"
         return header_str
 
-    header_size = header["HDR_SIZE"]
+    header_size = int(header["HDR_SIZE"])
     header_str = header_to_str(header)
     header_len = len(header_str)
     while header_size < header_len:
@@ -150,3 +151,84 @@ def get_most_recent_data_file(directory: str,
     file_paths.sort(key=lambda x: x[1])
 
     return file_paths[-1][0]
+
+
+def _add_fir_data_to_existing_file(
+    file_path: str,
+    fir_file_path: str,
+    os_factor: str,
+    channels: int,
+    overwrite: bool = False
+) -> None:
+    _, coeff = load_matlab_filter_coef(fir_file_path)
+
+    fir_info = [{
+        "COEFF": coeff,
+        "NTAPS": len(coeff),
+        "OVERSAMP": str(os_factor),
+        "NCHAN_PFB": channels
+    }]
+
+    header, data = load_dada_file(file_path)
+    header = add_filter_info_to_header(header, fir_info)
+    output_file_path = file_path
+    counter = 0
+    if not overwrite:
+        output_file_path = f"{output_file_path}.{counter}"
+        while os.path.exists(output_file_path):
+            counter += 1
+            output_file_path_split = output_file_path.split(".")
+            output_file_path_split[-1] = str(counter)
+            output_file_path = ".".join(output_file_path_split)
+
+    dump_dada_file(output_file_path, header, data)
+
+
+def create_parser():
+
+    # current_dir = os.path.dirname(os.path.abspath(__file__))
+
+    # config_dir = os.getenv("PFB_CONFIG_DIR",
+    #                        os.path.join(current_dir, "config"))
+    # data_dir = os.getenv("PFB_DATA_DIR",
+    #                      os.path.join(current_dir, "data"))
+
+    parser = argparse.ArgumentParser(
+        description="add FIR filter info to existing DADA file")
+
+    parser.add_argument("-i", "--input-file",
+                        dest="input_file_path",
+                        required=True)
+
+    parser.add_argument("-f", "--fir-file",
+                        dest="fir_file_path",
+                        required=True)
+
+    parser.add_argument("-c", "--channels",
+                        dest="channels", default=8, type=int)
+
+    parser.add_argument("-os", "--oversampling_factor",
+                        dest="oversampling_factor", default="1/1", type=str)
+
+    parser.add_argument("-ow", "--overwrite",
+                        dest="overwrite", action="store_true")
+
+    return parser
+
+
+if __name__ == "__main__":
+    parsed = create_parser().parse_args()
+    # log_level = logging.INFO
+    # if parsed.verbose:
+    #     log_level = logging.DEBUG
+    #
+    # logging.basicConfig(level=log_level)
+    # logging.getLogger("matplotlib").setLevel(logging.ERROR)
+
+    _add_fir_data_to_existing_file(
+        parsed.input_file_path,
+        parsed.fir_file_path,
+        parsed.oversampling_factor,
+        parsed.channels,
+        parsed.overwrite
+    )
