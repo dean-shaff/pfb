@@ -39,6 +39,27 @@ class DADAFile:
     def data(self):
         return self._data
 
+    @data.setter
+    def data(self, new_data):
+        if new_data.ndim != 1 and new_data.ndim != 4:
+            raise RuntimeError(f"Ambiguous data shape: {new_data.ndim}")
+
+        if new_data.ndim == 1:
+            iscomplex = np.iscomplex(new_data)
+            if np.all(iscomplex):
+                self._data = np.zeros((new_data.shape[0], 1, 1, 2))
+                self._data[:, 0, 0, 0] = new_data.real
+                self._data[:, 0, 0, 1] = new_data.imag
+            else:
+                self._data = np.zeros((new_data.shape[0], 1, 1, 1))
+                self._data[:, 0, 0, 0] = new_data
+
+        if new_data.ndim == 4:
+            self._data = new_data
+
+        self["NDAT"], self["NCHAN"], self["NPOL"], self["NDIM"] = \
+            [str(i) for i in self._data.shape]
+
     @property
     def nchan(self):
         return int(self["NCHAN"])
