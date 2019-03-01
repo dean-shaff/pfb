@@ -88,7 +88,7 @@ def dump_dada_file(file_path: str,
              if key not in _exclude_header_keys]) + "\n"
         return header_str
 
-    header_size = header["HDR_SIZE"]
+    header_size = int(header["HDR_SIZE"])
     header_str = header_to_str(header)
     header_len = len(header_str)
     while header_size < header_len:

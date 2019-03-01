@@ -44,24 +44,24 @@ class DataFile:
 
     @data.setter
     def data(self, new_data):
-        if new_data.ndim != 1 and new_data.ndim != 4:
-            raise RuntimeError(f"Ambiguous data shape: {new_data.ndim}")
+        # if new_data.ndim != 1 and new_data.ndim != 4:
+        #     raise RuntimeError(f"Ambiguous data shape: {new_data.ndim}")
+        iscomplex = np.iscomplex(new_data)
+        ndim = 1
+        if np.all(iscomplex):
+            ndim = 2
+        ndat = new_data.shape[0]
 
         if new_data.ndim == 1:
-            iscomplex = np.iscomplex(new_data)
-            if np.all(iscomplex):
-                self._data = np.zeros((new_data.shape[0], 1, 1, 2))
-                self._data[:, 0, 0, 0] = new_data.real
-                self._data[:, 0, 0, 1] = new_data.imag
-            else:
-                self._data = np.zeros((new_data.shape[0], 1, 1, 1))
-                self._data[:, 0, 0, 0] = new_data
-
-        if new_data.ndim == 4:
+            nchan, npol = 1, 1
+            self._data = np.zeros((ndat, nchan, npol), dtype=new_data.dtype)
+            self._data[:, 0, 0] = new_data
+        else:
+            nchan, npol = new_data.shape[1], new_data.shape[2]
             self._data = new_data
 
         self["NDAT"], self["NCHAN"], self["NPOL"], self["NDIM"] = \
-            [str(i) for i in self._data.shape]
+            [str(i) for i in [ndat, nchan, npol, ndim]]
 
     @property
     def nchan(self):
@@ -151,7 +151,7 @@ class DADAFile(DataFile):
                              for item in ["NDIM", "NCHAN", "NPOL"]]
 
         data = data.reshape((-1, nchan, npol, ndim))
-        if ndim == 2: # means we're dealing with complex data
+        if ndim == 2:  # means we're dealing with complex data
             data = data[:, :, :, 0] + 1j*data[:, :, :, 1]
 
         return data
@@ -161,28 +161,28 @@ class DADAFile(DataFile):
         self._load_data_from_file()
         self._data = self._shape_data(self._data).copy()
 
-    def dump_data(self, overwrite=False):
+    def dump_data(self, overwrite=True):
 
         new_file_path = self.file_path
         if not overwrite:
-            exists = True
-            i = 1
-            temp_file_path = f"{new_file_path}.{i}"
-            exists = os.path.exists(temp_file_path)
+            exists = os.path.exists(new_file_path)
+            temp_file_path = new_file_path
+            # temp_file_path = f"{new_file_path}.{i}"
+            i = 0
             while exists:
-                i += 1
                 temp_file_path = f"{new_file_path}.{i}"
                 exists = os.path.exists(temp_file_path)
+                i += 1
             new_file_path = temp_file_path
 
         if self.ndim == 1:
             data = self.data.flatten()
         else:
             data = np.zeros((self.ndat, self.nchan, self.ndim*self.npol),
-                            dtype=self["FLOAT_DTYPE"])
+                            dtype=np.float32)
             for pol in range(self.npol):
-                data[:, :, pol*2] = self.data[:,:,pol].real
-                data[:, :, pol*2 + 1] = self.data[:,:,pol].imag
+                data[:, :, pol*2] = self.data[:, :, pol].real
+                data[:, :, pol*2 + 1] = self.data[:, :, pol].imag
         self.logger.debug(f"dump_data: new file path: {new_file_path}")
         dump_dada_file(new_file_path, self.header, data)
         return new_file_path

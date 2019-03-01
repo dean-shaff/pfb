@@ -15,7 +15,7 @@ from .util import (
     load_matlab_filter_coef,
     get_most_recent_data_file
 )
-from .format import DADAFile, DataFile
+from .formats import DADAFile, DataFile
 from .rational import Rational
 
 module_logger = logging.getLogger(__name__)
@@ -154,9 +154,6 @@ class PFBChannelizer:
         self.logger.debug(
             (f"pad_fir_filter_coeff: self.fir_filter_coeff.shape:"
              f" {self.fir_filter_coeff.shape}"))
-        self.logger.debug(
-            (f"pad_fir_filter_coeff: Took {time.time()-t0:.4f} "
-             f"seconds to load pfb configuration data"))
 
     def calc_output_tsamp(self) -> float:
         return (int(self._ndim_ratio) *
@@ -168,9 +165,9 @@ class PFBChannelizer:
 
         ndat_input = self.input_data.shape[0]
         norm_chan = self.oversampling_factor.normalize(self._output_nchan)
-        int_ndim_ratio = int(self._ndim_ratio)
-        self._output_samples = int(ndat_input / (norm_chan * int_ndim_ratio))
-        self._input_samples = self._output_samples * norm_chan * int_ndim_ratio
+        # int_ndim_ratio = int(self._ndim_ratio)
+        self._output_samples = int(ndat_input / norm_chan)
+        self._input_samples = self._output_samples * norm_chan
 
         self.logger.debug(
             f"_init_output_data: ndat_input: {ndat_input}")
@@ -179,11 +176,22 @@ class PFBChannelizer:
         self.logger.debug(
             f"_init_output_data: self._input_samples: {self._input_samples}")
 
+        # self.output_data = np.zeros((
+        #     int(self._output_samples / (self._input_npol * self._input_ndim)),
+        #     self._output_nchan,
+        #     self._output_ndim * self._output_npol
+        # ), dtype=self._float_dtype)
+
         self.output_data = np.zeros((
-            int(self._output_samples / (self._input_npol * self._input_ndim)),
+            self._output_samples,
             self._output_nchan,
-            self._output_ndim * self._output_npol
+            self._output_npol
         ), dtype=self._float_dtype)
+
+        self.logger.debug(
+            (f"_init_output_data: "
+             f"self.output_data.shape: {self.output_data.shape}"))
+
 
     def _init_output_data_file(self):
 
@@ -195,7 +203,7 @@ class PFBChannelizer:
         self.output_data_file['NCHAN'] = self._output_nchan
         self.output_data_file['NPOL'] = self._output_npol
         self.output_data_file['TSAMP'] = self.calc_output_tsamp()
-        self.output_header['OS_FACTOR'] = f"{os_factor.nu}/{os_factor.de}"
+        self.output_data_file['OS_FACTOR'] = f"{os_factor.nu}/{os_factor.de}"
 
     def _dump_data(self, data_file: DataFile):
         data_file.dump_data()
@@ -215,18 +223,22 @@ class PFBChannelizer:
         return arr
 
     def _channelize(self,
-                    input_samples: int,
-                    input_samples_per_pol_dim: int,
-                    output_samples_per_pol_dim: int):
+                    input_samples: np.ndarray):
+                    # input_samples_per_pol_dim: int,
+                    # output_samples_per_pol_dim: int):
 
         t_total = time.time()
 
         nchan = self._output_nchan
 
-        filter_coef_per_chan = int(self.fir_filter_coeff.shape[0] / nchan)
+        # filter_coef_per_chan = int(self.fir_filter_coeff.shape[0] / nchan)
 
+        # output_filtered = np.zeros(
+        #     (output_samples_per_pol_dim, nchan),
+        #     dtype=input_samples.dtype
+        # )
         output_filtered = np.zeros(
-            (output_samples_per_pol_dim, nchan),
+            (self.output_data.shape[0], nchan),
             dtype=input_samples.dtype
         )
 
@@ -235,7 +247,7 @@ class PFBChannelizer:
         nchan_norm = self.oversampling_factor.normalize(nchan)
 
         for p in range(self._input_npol):
-            p_idx = self._output_ndim * p
+            # p_idx = self._output_ndim * p
             t0 = time.time()
 
             output_filtered = filter(
@@ -269,8 +281,10 @@ class PFBChannelizer:
             # output_filtered_fft = nchan*np.fft.fft(
             #     output_filtered, n=nchan, axis=1)
 
-            self.output_data[:, :, p_idx] = np.real(output_filtered_fft)
-            self.output_data[:, :, p_idx+1] = np.imag(output_filtered_fft)
+            # self.output_data[:, :, p] = np.real(output_filtered_fft)
+            # self.output_data[:, :, p] = np.imag(output_filtered_fft)
+            # self.output_data[:, :, p] = output_filtered_fft.real + 1j*output_filtered_fft.imag
+            self.output_data[:, :, p] = output_filtered_fft
 
         # print(self.output_data.shape)
         # self.output_data = self.output_data[int(filter_coef_per_chan/2):, :, :]
@@ -305,73 +319,93 @@ class PFBChannelizer:
             output_file_name = (f"pfb.{os_text}."
                                 f"nchan_{nchan}."
                                 f"ntaps_{len(self.fir_filter_coeff)}.dump")
-            output_file_path = output_file_name
+            output_file_path = os.path.join(os.getcwd(), output_file_name)
 
         self.output_file_path = output_file_path
 
         if self.input_data is None:
             self._load_input_data()
-        if self.output_header is None:
-            self._init_output_header()
+        if self.output_data_file is None:
+            self._init_output_data_file()
         if self.output_data is None:
             self._init_output_data()
-        self._load_fir_config(pad=True)
+        self.pad_fir_filter_coeff(nchan)
         # self.fir_filter_coeff = self.fir_filter_coeff[:155]
 
-        input_samples = self.input_data[:self._input_samples]
+        input_samples = self.input_data[:self._input_samples, 0, :]
+        self.logger.debug((f"_prepare_channelize: "
+                           f"input_samples.shape={input_samples.shape}"))
 
-        input_samples_per_pol_dim = int(
-            self._input_samples / (self._input_npol*self._input_ndim))
-        output_samples_per_pol_dim = int(
-            self._output_samples / (self._output_npol*self._input_ndim))
+        # input_samples_per_pol_dim = int(
+        #     self._input_samples / (self._input_npol*self._input_ndim))
+        # output_samples_per_pol_dim = int(
+        #     self._output_samples / (self._output_npol*self._input_ndim))
 
-        if self._input_ndim == 2:
-            input_samples = input_samples[:(input_samples_per_pol_dim *
-                                            self._input_npol*self._input_ndim)]
-            input_samples_temp = input_samples.reshape(
-                (input_samples_per_pol_dim, self._input_npol*self._input_ndim))
-            input_samples = np.zeros(
-                (input_samples_per_pol_dim, self._input_npol),
-                dtype=self._complex_dtype)
+        # input_samples_per_pol_dim = int(
+        #     self._input_samples/self._input_npol)
+        # output_samples_per_pol_dim = int(
+        #     self._output_samples/self._output_npol)
 
-            input_samples[:, 0] = (input_samples_temp[:, 0] +
-                                   1j*input_samples_temp[:, 1])
-            input_samples[:, 1] = (input_samples_temp[:, 2] +
-                                   1j*input_samples_temp[:, 3])
+        # if self._input_ndim == 2:
+        #     input_samples = input_samples[:(input_samples_per_pol_dim *
+        #                                     self._input_npol*self._input_ndim)]
+        #     input_samples_temp = input_samples.reshape(
+        #         (input_samples_per_pol_dim, self._input_npol*self._input_ndim))
+        #     input_samples = np.zeros(
+        #         (input_samples_per_pol_dim, self._input_npol),
+        #         dtype=self._complex_dtype)
+        #
+        #     input_samples[:, 0] = (input_samples_temp[:, 0] +
+        #                            1j*input_samples_temp[:, 1])
+        #     input_samples[:, 1] = (input_samples_temp[:, 2] +
+        #                            1j*input_samples_temp[:, 3])
+        #
+        #     # input_samples = input_samples[:, 0] + 1j*input_samples[:, 1]
+        #
+        # elif self._input_ndim == 1:
+        #     input_samples = input_samples.reshape(
+        #         (input_samples_per_pol_dim, self._input_npol))
 
-            # input_samples = input_samples[:, 0] + 1j*input_samples[:, 1]
-
-        elif self._input_ndim == 1:
-            input_samples = input_samples.reshape(
-                (input_samples_per_pol_dim, self._input_npol))
+        # input_samples = input_samples.reshape(
+        #     (input_samples_per_pol_dim, self._input_npol)
+        # )
 
         # do any downsampling necessary for conversion
         # from real to complex data.
         if int(self._ndim_ratio) != 1:
             input_samples = input_samples[::int(self._ndim_ratio), :]
 
-        return (input_samples,
-                input_samples_per_pol_dim,
-                output_samples_per_pol_dim)
+        return (input_samples)
+                # input_samples_per_pol_dim,
+                # output_samples_per_pol_dim)
 
     def channelize(self, *args, **kwargs):
-        prepped = self._prepare_channelize(*args, **kwargs)
-
+        input_samples = self._prepare_channelize(*args, **kwargs)
         # if not self.oversampled:
         #     g = self._channelize_fft(*prepped)
         # else:
-        g = self._channelize(*prepped)
+        g = self._channelize(input_samples)
 
         for i in g:
             pass
-        self._dump_data(self.output_header, self.output_data)
+        self.output_data_file.data = self.output_data
+        self._dump_data(self.output_data_file)
 
     @staticmethod
-    def from_input_files(
-        input_file_path: str, fir_file_path: str) -> PFBChannelizer:
+    def from_input_files(input_file_path: str, fir_file_path: str):
 
         dada_file = DADAFile(input_file_path)
+        dada_file.load_data()
+        module_logger.debug(
+            (f"PFBChannelizer.from_input_files: "
+             f"dada_file.ndat={dada_file.ndat}, "
+             f"dada_file.npol={dada_file.npol}, "
+             f"dada_file.ndim={dada_file.ndim}, "
+             f"dada_file.nchan={dada_file.nchan}"))
         input_data = dada_file.data
+        module_logger.debug(
+            ("PFBChannelizer.from_input_files: "
+             f"input_data.dtype={input_data.dtype}"))
         input_tsamp = float(dada_file["TSAMP"])
 
         fir_config, fir_filter_coef = load_matlab_filter_coef(fir_file_path)

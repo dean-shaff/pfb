@@ -50,11 +50,11 @@ class TestPFBChannelizer(unittest.TestCase):
         )
         self.channelizer = channelizer
 
-    # @unittest.skip("")
+    @unittest.skip("")
     def test_filter_response(self):
         nchan = 8
-        prepped = self.channelizer._prepare_channelize(nchan, "1/1")
-        g = self.channelizer._channelize(*prepped)
+        samples = self.channelizer._prepare_channelize(nchan, "1/1")
+        g = self.channelizer._channelize(samples)
         filtered = next(g)
         fft_size = filtered.shape[0]
 
@@ -66,7 +66,7 @@ class TestPFBChannelizer(unittest.TestCase):
             for j in range(axes.shape[1]):
                 axes[i, j].grid(True)
                 axes[0, j].set_xlim(xlim)
-        filter_coef_per_chan = self.channelizer._fir_filter_coef.shape[0] // nchan
+        filter_coef_per_chan = self.channelizer.fir_filter_coeff.shape[0] // nchan
         for c in range(nchan):
             axes[0, c].plot(filtered[:, c].real)
             axes[0, c].plot(filtered[:, c].imag)
@@ -116,7 +116,7 @@ class TestPFBChannelizer(unittest.TestCase):
             compare_dump_files(expected_file_path,
                                self.channelizer.output_file_path, atol=1e-5))
 
-    @unittest.skip("")
+    # @unittest.skip("")
     def test_over_sampled_pfb_vs_matlab(self):
 
         expected_file_path = os.path.join(
