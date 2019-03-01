@@ -2,5 +2,5 @@
 *.log
 *.txt
 *.mat
-src/__pycache__
+src/pfb/__pycache__
 *.egg-info/
