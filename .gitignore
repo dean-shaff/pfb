@@ -4,3 +4,4 @@
 *.mat
 src/__pycache__
 *.egg-info/
+build/

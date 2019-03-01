@@ -10,13 +10,16 @@ from .util import (
 
 module_logger = logging.getLogger(__name__)
 
-__all__ = ["DADAFile"]
+__all__ = [
+    "DataFile",
+    "DADAFile"
+]
 
 
-class DADAFile:
+class DataFile:
 
     def __init__(self, file_path):
-        self.logger = module_logger.getChild("DADAFile")
+        self.logger = module_logger.getChild("DataFile")
         self._file_path = file_path
         self._header = None
         self._data = None
@@ -78,6 +81,62 @@ class DADAFile:
             if self.data.ndim > 1:
                 return self.data.shape[0]
 
+    def __getitem__(self, item):
+        if self._header is not None:
+            if item in self._header:
+                return self._header[item]
+
+    def __setitem__(self, item, val):
+        if self._header is not None:
+            if item in self._header:
+                self._header[item] = val
+
+    def __contains__(self, item):
+        if self._header is not None:
+            if item in self._header:
+                return True
+            else:
+                return False
+        else:
+            raise RuntimeError(("DataFile.__contains__: Need to load "
+                                "data from file before calling __contains__"))
+
+    def load_data(self):
+        raise NotImplemented()
+
+    def dump_data(self, overwrite=False):
+        raise NotImplemented()
+
+
+class DADAFile(DataFile):
+
+    default_header = {
+        "HDR_VERSION": "1.0",
+        "HDR_SIZE": "4096",
+        "TELESCOPE": "PKS",
+        "PRIMARY": "dspsr",
+        "UTC_START": "2007-05-18-15:55:58",
+        "SOURCE": "J1644-4559",
+        "RA": "16:44:49.28",
+        "DEC": "-45:59:09.5",
+        "FREQ": "1405.000000",
+        "BW": "40",
+        "TSAMP": "0.0125",
+        "NBIT": "32",
+        "NDIM": "2",
+        "NPOL": "2",
+        "NCHAN": "1",
+        "MODE": "PSR",
+        "OBS_OFFSET": "0",
+        "INSTRUMENT": "dspsr",
+        "DSB": "0"
+    }
+
+    def __init__(self, file_path):
+        super(DADAFile, self).__init__(file_path)
+        self._header = self.default_header.copy()
+        self.logger = module_logger.getChild("DADAFile")
+
     def _load_data_from_file(self):
 
         self._header, self._data = load_dada_file(self.file_path)
@@ -127,23 +186,3 @@ class DADAFile:
         self.logger.debug(f"dump_data: new file path: {new_file_path}")
         dump_dada_file(new_file_path, self.header, data)
         return new_file_path
-
-    def __getitem__(self, item):
-        if self._header is not None:
-            if item in self._header:
-                return self._header[item]
-
-    def __setitem__(self, item, val):
-        if self._header is not None:
-            if item in self._header:
-                self._header[item] = val
-
-    def __contains__(self, item):
-        if self._header is not None:
-            if item in self._header:
-                return True
-            else:
-                return False
-        else:
-            raise RuntimeError(("DADAFile.__contains__: Need to load "
-                                "data from file before calling __contains__"))

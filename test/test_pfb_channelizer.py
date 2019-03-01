@@ -44,7 +44,7 @@ def compare_dump_files(file_path0, file_path1, **kwargs):
 class TestPFBChannelizer(unittest.TestCase):
 
     def setUp(self):
-        channelizer = PFBChannelizer(
+        channelizer = PFBChannelizer.from_input_files(
             input_file_path,
             fir_file_path
         )
