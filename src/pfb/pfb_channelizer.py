@@ -355,45 +355,10 @@ class PFBChannelizer:
         if self.output_data is None:
             self._init_output_data()
         self.pad_fir_filter_coeff(nchan)
-        # self.fir_filter_coeff = self.fir_filter_coeff[:155]
 
         input_samples = self.input_data[:self._input_samples, 0, :]
         self.logger.debug((f"_prepare_channelize: "
                            f"input_samples.shape={input_samples.shape}"))
-
-        # input_samples_per_pol_dim = int(
-        #     self._input_samples / (self._input_npol*self._input_ndim))
-        # output_samples_per_pol_dim = int(
-        #     self._output_samples / (self._output_npol*self._input_ndim))
-
-        # input_samples_per_pol_dim = int(
-        #     self._input_samples/self._input_npol)
-        # output_samples_per_pol_dim = int(
-        #     self._output_samples/self._output_npol)
-
-        # if self._input_ndim == 2:
-        #     input_samples = input_samples[:(input_samples_per_pol_dim *
-        #                                     self._input_npol*self._input_ndim)]
-        #     input_samples_temp = input_samples.reshape(
-        #         (input_samples_per_pol_dim, self._input_npol*self._input_ndim))
-        #     input_samples = np.zeros(
-        #         (input_samples_per_pol_dim, self._input_npol),
-        #         dtype=self._complex_dtype)
-        #
-        #     input_samples[:, 0] = (input_samples_temp[:, 0] +
-        #                            1j*input_samples_temp[:, 1])
-        #     input_samples[:, 1] = (input_samples_temp[:, 2] +
-        #                            1j*input_samples_temp[:, 3])
-        #
-        #     # input_samples = input_samples[:, 0] + 1j*input_samples[:, 1]
-        #
-        # elif self._input_ndim == 1:
-        #     input_samples = input_samples.reshape(
-        #         (input_samples_per_pol_dim, self._input_npol))
-
-        # input_samples = input_samples.reshape(
-        #     (input_samples_per_pol_dim, self._input_npol)
-        # )
 
         # do any downsampling necessary for conversion
         # from real to complex data.
@@ -401,8 +366,6 @@ class PFBChannelizer:
             input_samples = input_samples[::int(self._ndim_ratio), :]
 
         return input_samples
-                # input_samples_per_pol_dim,
-                # output_samples_per_pol_dim
 
     def channelize(self, *args, **kwargs):
         input_samples = self._prepare_channelize(*args, **kwargs)
