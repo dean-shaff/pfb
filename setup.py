@@ -2,9 +2,11 @@
 
 from distutils.core import setup
 
+from src.pfb import __version__
+
 setup(
     name="pfb",
-    version="0.1.0",
+    version=__version__,
     description="PFB channelization and inversion",
     author="Dean Shaff",
     author_email="dean.shaff@gmail.com",
