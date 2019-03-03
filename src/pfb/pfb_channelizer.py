@@ -2,7 +2,6 @@ import os
 import time
 import logging
 import argparse
-import typing
 
 import numpy as np
 import numba
@@ -142,7 +141,7 @@ class PFBChannelizer:
         self._pfb_input_mask = None
         self._pfb_output_mask = None
 
-    def pad_fir_filter_coeff(self, nchan):
+    def pad_fir_filter_coeff(self, nchan: int):
         fir_len = self.fir_filter_coeff.shape[0]
         rem = fir_len % nchan
         self._fir_filter_coeff_padded = np.zeros(
@@ -247,44 +246,27 @@ class PFBChannelizer:
 
     def _channelize(self,
                     input_samples: np.ndarray):
-                    # input_samples_per_pol_dim: int,
-                    # output_samples_per_pol_dim: int):
 
         t_total = time.time()
 
         nchan = self._output_nchan
 
-        # filter_coef_per_chan = int(self.fir_filter_coeff.shape[0] / nchan)
-
-        # output_filtered = np.zeros(
-        #     (output_samples_per_pol_dim, nchan),
-        #     dtype=input_samples.dtype
-        # )
         output_filtered = np.zeros(
             (self.output_data.shape[0], nchan),
             dtype=input_samples.dtype
         )
 
-        # output_filtered = output_filtered.copy()
-
         nchan_norm = self.oversampling_factor.normalize(nchan)
-        # print(input_samples.shape)
-        # print(self._fir_filter_coeff_padded.shape)
         for p in range(self._input_npol):
-            # p_idx = self._output_ndim * p
             t0 = time.time()
 
             output_filtered = apply_filter(
                 input_samples[:, p].copy(),
-                # self.fir_filter_coeff,
                 self._fir_filter_coeff_padded,
                 output_filtered,
                 nchan,
                 nchan_norm
             )
-
-            # output_filtered = output_filtered[filter_coef_per_chan:, :]
-            # output_filtered[:filter_coef_per_chan, :] = 0.0
 
             self.logger.debug(
                 (f"_channelize: "
@@ -303,18 +285,7 @@ class PFBChannelizer:
             output_filtered_fft = (nchan**2)*np.fft.ifft(
                 output_filtered, n=nchan, axis=1)
 
-            # output_filtered_fft = nchan*np.fft.fft(
-            #     output_filtered, n=nchan, axis=1)
-
-            # self.output_data[:, :, p] = np.real(output_filtered_fft)
-            # self.output_data[:, :, p] = np.imag(output_filtered_fft)
-            # self.output_data[:, :, p] = output_filtered_fft.real + 1j*output_filtered_fft.imag
             self.output_data[:, :, p] = output_filtered_fft
-
-        # print(self.output_data.shape)
-        # self.output_data = self.output_data[int(filter_coef_per_chan/2):, :, :]
-        # self.output_header['OFFSET'] = filter_coef_per_chan * nchan * self._output_ndim * self._output_npol * np.dtype(self._float_dtype).itemsize
-        # print(self.output_data.shape)
 
         self.logger.debug(
             (f"_channelize: "
@@ -338,9 +309,8 @@ class PFBChannelizer:
             self.oversampled = True
 
         if output_file_path is None:
-            os_text = "cs"
-            if self.oversampled:
-                os_text = "os"
+            os_text = (f"os_{self.oversampling_factor.nu}-"
+                       f"{self.oversampling_factor.de}")
             output_file_name = (f"pfb.{os_text}."
                                 f"nchan_{nchan}."
                                 f"ntaps_{len(self.fir_filter_coeff)}.dump")

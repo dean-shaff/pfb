@@ -135,6 +135,6 @@ class TestPFBChannelizer(unittest.TestCase):
                                self.channelizer.output_file_path, atol=1e-5))
 
 
-if __name__ == '__main__' :
+if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     unittest.main()

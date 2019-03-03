@@ -1,5 +1,6 @@
 import os
 import logging
+import typing
 
 import numpy as np
 
@@ -18,36 +19,36 @@ __all__ = [
 
 class DataFile:
 
-    def __init__(self, file_path):
+    def __init__(self, file_path: str):
         self.logger = module_logger.getChild("DataFile")
         self._file_path = file_path
         self._header = None
         self._data = None
 
     @property
-    def file_path(self):
+    def file_path(self) -> str:
         return self._file_path
 
     @file_path.setter
-    def file_path(self, file_path):
+    def file_path(self, file_path: str) -> None:
         self._file_path = file_path
         self._data = None
         self._header = None
 
     @property
-    def header(self):
+    def header(self) -> dict:
         return self._header
 
     @header.setter
-    def header(self, new_header):
+    def header(self, new_header: dict) -> None:
         self._header = new_header
 
     @property
-    def data(self):
+    def data(self) -> np.ndarray:
         return self._data
 
     @data.setter
-    def data(self, new_data):
+    def data(self, new_data: np.ndarray):
         # if new_data.ndim != 1 and new_data.ndim != 4:
         #     raise RuntimeError(f"Ambiguous data shape: {new_data.ndim}")
         iscomplex = np.iscomplex(new_data)
@@ -68,34 +69,34 @@ class DataFile:
             [str(i) for i in [ndat, nchan, npol, ndim]]
 
     @property
-    def nchan(self):
+    def nchan(self) -> int:
         return int(self["NCHAN"])
 
     @property
-    def ndim(self):
+    def ndim(self) -> int:
         return int(self["NDIM"])
 
     @property
-    def npol(self):
+    def npol(self) -> int:
         return int(self["NPOL"])
 
     @property
-    def ndat(self):
+    def ndat(self) -> int:
         if self.data is not None:
             if self.data.ndim > 1:
                 return self.data.shape[0]
 
-    def __getitem__(self, item):
+    def __getitem__(self, item: str) -> typing.Any:
         if self._header is not None:
             if item in self._header:
                 return self._header[item]
 
-    def __setitem__(self, item, val):
+    def __setitem__(self, item: str, val: typing.Any) -> None:
         if self._header is not None:
             if item in self._header:
                 self._header[item] = val
 
-    def __contains__(self, item):
+    def __contains__(self, item: str) -> bool:
         if self._header is not None:
             if item in self._header:
                 return True
@@ -136,16 +137,16 @@ class DADAFile(DataFile):
         "DSB": "0"
     }
 
-    def __init__(self, file_path):
+    def __init__(self, file_path: str):
         super(DADAFile, self).__init__(file_path)
         self._header = self.default_header.copy()
         self.logger = module_logger.getChild("DADAFile")
 
-    def _load_data_from_file(self):
+    def _load_data_from_file(self) -> None:
 
         self._header, self._data = load_dada_file(self.file_path)
 
-    def _shape_data(self, data):
+    def _shape_data(self, data: np.ndarray) -> None:
 
         if self._header is None:
             raise RuntimeError(("DADAFile._shape_data: Need to load "
@@ -160,12 +161,12 @@ class DADAFile(DataFile):
 
         return data
 
-    def load_data(self):
+    def load_data(self) -> None:
 
         self._load_data_from_file()
         self._data = self._shape_data(self._data).copy()
 
-    def dump_data(self, overwrite=True):
+    def dump_data(self, overwrite: bool = True) -> str:
 
         new_file_path = self.file_path
         if not overwrite:
