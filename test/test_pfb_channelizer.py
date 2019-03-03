@@ -12,8 +12,13 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 data_dir = os.path.join(current_dir, "test_data")
 
 
+# This is the FIR filter file for the matlab channelized data.
 fir_file_path = os.path.join(
-    current_dir, "Prototype_FIR.mat")
+    current_dir, "OS_Prototype_FIR_8.matlab.mat")
+# fir_file_path = os.path.join(
+#     current_dir, "Prototype_FIR.mat")
+# fir_file_path = os.path.join(
+#     current_dir, "Prototype_FIR.120.mat")
 
 input_file_path = os.path.join(
     data_dir, "impulse.noise_0.0.nseries_3.ndim_2.dump")
@@ -44,17 +49,17 @@ def compare_dump_files(file_path0, file_path1, **kwargs):
 class TestPFBChannelizer(unittest.TestCase):
 
     def setUp(self):
-        channelizer = PFBChannelizer(
+        channelizer = PFBChannelizer.from_input_files(
             input_file_path,
             fir_file_path
         )
         self.channelizer = channelizer
 
-    # @unittest.skip("")
+    @unittest.skip("")
     def test_filter_response(self):
         nchan = 8
-        prepped = self.channelizer._prepare_channelize(nchan, "1/1")
-        g = self.channelizer._channelize(*prepped)
+        samples = self.channelizer._prepare_channelize(nchan, "1/1")
+        g = self.channelizer._channelize(samples)
         filtered = next(g)
         fft_size = filtered.shape[0]
 
@@ -66,7 +71,7 @@ class TestPFBChannelizer(unittest.TestCase):
             for j in range(axes.shape[1]):
                 axes[i, j].grid(True)
                 axes[0, j].set_xlim(xlim)
-        filter_coef_per_chan = self.channelizer._fir_filter_coef.shape[0] // nchan
+        filter_coef_per_chan = self.channelizer.fir_filter_coeff.shape[0] // nchan
         for c in range(nchan):
             axes[0, c].plot(filtered[:, c].real)
             axes[0, c].plot(filtered[:, c].imag)
@@ -103,7 +108,7 @@ class TestPFBChannelizer(unittest.TestCase):
             axes[2, c].plot(np.abs(f0[:, c] - f1[:, c]))
         plt.show()
 
-    @unittest.skip("")
+    # @unittest.skip("")
     def test_critically_sampled_pfb_vs_matlab(self):
 
         expected_file_path = os.path.join(
@@ -116,7 +121,7 @@ class TestPFBChannelizer(unittest.TestCase):
             compare_dump_files(expected_file_path,
                                self.channelizer.output_file_path, atol=1e-5))
 
-    @unittest.skip("")
+    # @unittest.skip("")
     def test_over_sampled_pfb_vs_matlab(self):
 
         expected_file_path = os.path.join(
