@@ -9,13 +9,8 @@ import numba
 
 from .util import (
     load_matlab_filter_coef,
-<<<<<<< HEAD
-    add_filter_info_to_header,
-    get_most_recent_data_file
-=======
     get_most_recent_data_file,
     add_filter_info_to_header
->>>>>>> refactor
 )
 from .formats import DADAFile, DataFile
 from .rational import Rational
@@ -141,56 +136,12 @@ class PFBChannelizer:
         self._output_ndim = 2
         self._output_samples = 0
 
-<<<<<<< HEAD
-        self._fir_config = None
-        self._fir_filter_coef = None
-        self._fir_info = None
-
-    def _populate_fir_info(self, filter_coef: np.ndarray) -> None:
-
-        if self._fir_info is None:
-            self._fir_info = {}
-
-        self._fir_info["OVERSAMP"] = self.output_header["OS_FACTOR"]
-        self._fir_info["NTAP"] = len(filter_coef)
-        self._fir_info["COEFF"] = filter_coef
-        self._fir_info["NCHAN_PFB"] = self._input_nchan
-=======
         self._n_series = None
         self._ndim_ratio = Rational(self._output_ndim, self._input_ndim)
->>>>>>> refactor
 
         self._pfb_input_mask = None
         self._pfb_output_mask = None
 
-<<<<<<< HEAD
-        t0 = time.time()
-        if self.fir_file_path.endswith(".mat"):
-            self._fir_config, self._fir_filter_coef = load_matlab_filter_coef(
-                self.fir_file_path)
-            self._fir_filter_coef = self._fir_filter_coef.astype(
-                self._float_dtype)
-        else:
-            raise RuntimeError(
-                ("No support for filter coefficient "
-                 "files other than matlab files"))
-
-        self._populate_fir_info(self._fir_filter_coef)
-
-        if diagnostic_plots:
-            plt.ion()
-            fig, ax = plt.subplots()
-            ax.grid(True)
-            ax.plot(self._fir_filter_coef)
-            input(">> ")
-
-        rem = self._fir_filter_coef.shape[0] % self._output_nchan
-        if rem != 0 and pad:
-            self._fir_filter_coef = np.append(
-                self._fir_filter_coef,
-                np.zeros(self._output_nchan - rem, dtype=self._float_dtype)
-            )
-=======
     def pad_fir_filter_coeff(self, nchan):
         fir_len = self.fir_filter_coeff.shape[0]
         rem = fir_len % nchan
@@ -199,7 +150,6 @@ class PFBChannelizer:
             dtype=self._float_dtype)
         self._fir_filter_coeff_padded[:fir_len] = \
             self.fir_filter_coeff
->>>>>>> refactor
 
         input_mask_dtype = (self._float_dtype if
                             self._input_ndim == 2 else
@@ -259,16 +209,9 @@ class PFBChannelizer:
 
     def _init_output_data_file(self):
 
-<<<<<<< HEAD
-    def _dump_data(self, header, data):
-        header = add_filter_info_to_header(
-            header, [self._fir_info])
-        dump_dada_file(self.output_file_path, header, data)
-=======
         self.output_data_file = DADAFile(self.output_file_path)
 
         os_factor = self.oversampling_factor
->>>>>>> refactor
 
         self.output_data_file['NDIM'] = 2
         self.output_data_file['NCHAN'] = self._output_nchan
