@@ -38,6 +38,10 @@ class DataFile:
     def header(self):
         return self._header
 
+    @header.setter
+    def header(self, new_header):
+        self._header = new_header
+
     @property
     def data(self):
         return self._data

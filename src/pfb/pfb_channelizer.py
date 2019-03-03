@@ -5,15 +5,12 @@ import argparse
 import typing
 
 import numpy as np
-import scipy.signal
-import matplotlib.pyplot as plt
 import numba
 
 from .util import (
-    load_dada_file,
-    dump_dada_file,
     load_matlab_filter_coef,
-    get_most_recent_data_file
+    get_most_recent_data_file,
+    add_filter_info_to_header
 )
 from .formats import DADAFile, DataFile
 from .rational import Rational
@@ -22,7 +19,11 @@ module_logger = logging.getLogger(__name__)
 
 
 @numba.njit(cache=True, fastmath=True)
-def filter(signal, filter_coef, filtered, downsample_by, increment_by=None):
+def apply_filter(signal: np.ndarray,
+                 filter_coef: np.ndarray,
+                 filtered: np.ndarray,
+                 downsample_by: int,
+                 increment_by: int = None) -> np.ndarray:
     """
     filter signal with filter_coef.
 
@@ -32,6 +33,7 @@ def filter(signal, filter_coef, filtered, downsample_by, increment_by=None):
     if increment_by is None:
         increment_by = downsample_by
     init_filter_size = filter_coef.shape[0]
+    # print(f"init_filter_size: {init_filter_size}")
     filter_dtype = filter_coef.dtype
     signal_dtype = signal.dtype
     is_real = True
@@ -39,12 +41,15 @@ def filter(signal, filter_coef, filtered, downsample_by, increment_by=None):
         is_real = False
 
     rem = init_filter_size % downsample_by
+    # print(f"rem: {rem}")
     if rem != 0:
         filter_coef_padded = np.zeros(
             (init_filter_size + downsample_by - rem),
             dtype=filter_dtype
         )
-        filter_coef_padded[init_filter_size:] = filter_coef
+        # print(filter_coef_padded.shape)
+        # filter_coef_padded[init_filter_size:] = filter_coef
+        filter_coef_padded[:init_filter_size] = filter_coef
         filter_coef = filter_coef_padded
 
     window_size = filter_coef.shape[0]
@@ -98,16 +103,25 @@ class PFBChannelizer:
         self.logger = module_logger.getChild("PFBChannelizer")
         self.input_data = input_data
         self.fir_filter_coeff = fir_filter_coeff
+        self._fir_filter_coeff_padded = None
         self.oversampling_factor = None
         self.input_tsamp = input_tsamp
 
         self.output_data = None
         self.output_data_file = None
 
-        self._float_dtype = self.input_data.dtype
-        self._complex_dtype = (np.complex64 if
-                               self._float_dtype == np.float32
-                               else np.complex128)
+        if np.iscomplexobj(self.input_data):
+            self._complex_dtype = self.input_data.dtype
+            self._float_dtype = (np.float32 if
+                                 self._complex_dtype == np.float32
+                                 else np.float64)
+
+        else:
+            self._float_dtype = self.input_data.dtype
+            self._complex_dtype = (np.complex64 if
+                                   self._float_dtype == np.float32
+                                   else np.complex128)
+
         self.fir_filter_coeff = self.fir_filter_coeff.astype(
             self._float_dtype)
 
@@ -129,31 +143,32 @@ class PFBChannelizer:
         self._pfb_output_mask = None
 
     def pad_fir_filter_coeff(self, nchan):
-
-        rem = self.fir_filter_coeff.shape[0] % nchan
-        self.fir_filter_coeff = np.append(
-            self.fir_filter_coeff,
-            np.zeros(nchan - rem, dtype=self._float_dtype)
-        )
+        fir_len = self.fir_filter_coeff.shape[0]
+        rem = fir_len % nchan
+        self._fir_filter_coeff_padded = np.zeros(
+            fir_len + rem,
+            dtype=self._float_dtype)
+        self._fir_filter_coeff_padded[:fir_len] = \
+            self.fir_filter_coeff
 
         input_mask_dtype = (self._float_dtype if
                             self._input_ndim == 2 else
                             self._complex_dtype)
 
         self._pfb_input_mask = np.zeros(
-            (self._output_npol, self.fir_filter_coeff.shape[0]),
+            (self._output_npol, self._fir_filter_coeff_padded.shape[0]),
             dtype=input_mask_dtype)
 
         self._pfb_output_mask = np.zeros(
-            (self._output_npol, self._output_nchan),
+            (self._output_npol, nchan),
             dtype=self._float_dtype)
 
-        self.logger.debug(
-            (f"pad_fir_filter_coeff: self.fir_filter_coeff.dtype: "
-             f" {self.fir_filter_coeff.dtype}"))
-        self.logger.debug(
-            (f"pad_fir_filter_coeff: self.fir_filter_coeff.shape:"
-             f" {self.fir_filter_coeff.shape}"))
+        # self.logger.debug(
+        #     (f"pad_fir_filter_coeff: self.fir_filter_coeff.dtype: "
+        #      f" {self.fir_filter_coeff.dtype}"))
+        # self.logger.debug(
+        #     (f"pad_fir_filter_coeff: self.fir_filter_coeff.shape:"
+        #      f" {self.fir_filter_coeff.shape}"))
 
     def calc_output_tsamp(self) -> float:
         return (int(self._ndim_ratio) *
@@ -186,12 +201,11 @@ class PFBChannelizer:
             self._output_samples,
             self._output_nchan,
             self._output_npol
-        ), dtype=self._float_dtype)
+        ), dtype=self._complex_dtype)
 
         self.logger.debug(
             (f"_init_output_data: "
              f"self.output_data.shape: {self.output_data.shape}"))
-
 
     def _init_output_data_file(self):
 
@@ -206,6 +220,15 @@ class PFBChannelizer:
         self.output_data_file['OS_FACTOR'] = f"{os_factor.nu}/{os_factor.de}"
 
     def _dump_data(self, data_file: DataFile):
+        # add filter info to the data_file
+        fir_info = [{
+            "OVERSAMP": str(self.oversampling_factor),
+            "COEFF": self.fir_filter_coeff,
+            "NCHAN_PFB": self._output_nchan
+        }]
+        data_file.header = add_filter_info_to_header(
+            data_file.header, fir_info)
+
         data_file.dump_data()
 
     def _spiral_roll(self, arr: np.ndarray, n: int = None):
@@ -245,14 +268,16 @@ class PFBChannelizer:
         # output_filtered = output_filtered.copy()
 
         nchan_norm = self.oversampling_factor.normalize(nchan)
-
+        # print(input_samples.shape)
+        # print(self._fir_filter_coeff_padded.shape)
         for p in range(self._input_npol):
             # p_idx = self._output_ndim * p
             t0 = time.time()
 
-            output_filtered = filter(
+            output_filtered = apply_filter(
                 input_samples[:, p].copy(),
-                self.fir_filter_coeff,
+                # self.fir_filter_coeff,
+                self._fir_filter_coeff_padded,
                 output_filtered,
                 nchan,
                 nchan_norm
@@ -375,9 +400,9 @@ class PFBChannelizer:
         if int(self._ndim_ratio) != 1:
             input_samples = input_samples[::int(self._ndim_ratio), :]
 
-        return (input_samples)
+        return input_samples
                 # input_samples_per_pol_dim,
-                # output_samples_per_pol_dim)
+                # output_samples_per_pol_dim
 
     def channelize(self, *args, **kwargs):
         input_samples = self._prepare_channelize(*args, **kwargs)
