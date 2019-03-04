@@ -42,20 +42,33 @@ def _process_header(header_arr: np.ndarray) -> dict:
     return header
 
 
-def load_dada_file(file_path: str, header_size: int = 4096) -> typing.List:
+def load_dada_file(file_path: str) -> typing.List:
+    header_size = 4096  # smalled header size supported by DADA format
+    header_read = False
     with open(file_path, "rb") as file:
         buffer = file.read()
+
+    while not header_read:
         header = np.frombuffer(
             buffer, dtype='c', count=header_size
         )
         header = _process_header(header)
-        float_dtype = _float_dtype_map[str(header["NBIT"])]
-        complex_dtype = _complex_dtype_map[str(header["NBIT"])]
-        header["FLOAT_DTYPE"] = float_dtype
-        header["COMPLEX_DTYPE"] = complex_dtype
-        data = np.frombuffer(
-            buffer, dtype=float_dtype, offset=header_size
-        )
+        if "HDR_SIZE" in header:
+            new_header_size = int(header["HDR_SIZE"])
+            if new_header_size == header_size:
+                header_read = True
+            else:
+                header_size = new_header_size
+        else:
+            header_size *= 2
+
+    float_dtype = _float_dtype_map[str(header["NBIT"])]
+    complex_dtype = _complex_dtype_map[str(header["NBIT"])]
+    header["FLOAT_DTYPE"] = float_dtype
+    header["COMPLEX_DTYPE"] = complex_dtype
+    data = np.frombuffer(
+        buffer, dtype=float_dtype, offset=header_size
+    )
     return [header, data]
 
 

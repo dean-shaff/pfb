@@ -100,5 +100,33 @@ class TestDumpDadaFile(unittest.TestCase):
         )
 
 
+class TestLoadDadaFile(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        cls.test_file_path_big_header = os.path.join(
+            data_dir, "test_load_dada_file.big_header.dump")
+
+        cls.test_file_path_std_header = os.path.join(
+            data_dir, "test_load_dada_file.std_header.dump")
+
+    def test_load_dada_file_big_header(self):
+        header, data = util.load_dada_file(
+            self.test_file_path_big_header,
+        )
+        self.assertTrue(header["HDR_SIZE"] == "8192")
+        self.assertTrue(header["NPOL"] == "2")
+        self.assertTrue(header["NCHAN"] == "1")
+
+    def test_load_dada_file_std_header(self):
+        header, data = util.load_dada_file(
+            self.test_file_path_std_header,
+        )
+        self.assertTrue(header["HDR_SIZE"] == "4096")
+        self.assertTrue(header["NPOL"] == "1")
+        self.assertTrue(header["NCHAN"] == "1")
+
+
+
 if __name__ == '__main__':
     unittest.main()
