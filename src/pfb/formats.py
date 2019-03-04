@@ -51,10 +51,8 @@ class DataFile:
     def data(self, new_data: np.ndarray):
         # if new_data.ndim != 1 and new_data.ndim != 4:
         #     raise RuntimeError(f"Ambiguous data shape: {new_data.ndim}")
-        iscomplex = np.iscomplex(new_data)
-        ndim = 1
-        if np.all(iscomplex):
-            ndim = 2
+        iscomplex = np.iscomplexobj(new_data)
+        ndim = 2 if iscomplex else 1
         ndat = new_data.shape[0]
 
         if new_data.ndim == 1:
@@ -65,8 +63,10 @@ class DataFile:
             nchan, npol = new_data.shape[1], new_data.shape[2]
             self._data = new_data
 
-        self["NDAT"], self["NCHAN"], self["NPOL"], self["NDIM"] = \
-            [str(i) for i in [ndat, nchan, npol, ndim]]
+        self["NDAT"] = str(ndat)
+        self["NCHAN"] = str(nchan)
+        self["NPOL"] = str(npol)
+        self["NDIM"] = str(ndim)
 
     @property
     def nchan(self) -> int:
@@ -107,10 +107,10 @@ class DataFile:
                                 "data from file before calling __contains__"))
 
     def load_data(self):
-        raise NotImplemented()
+        raise NotImplementedError()
 
     def dump_data(self, overwrite=False):
-        raise NotImplemented()
+        raise NotImplementedError()
 
 
 class DADAFile(DataFile):
