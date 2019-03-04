@@ -126,7 +126,8 @@ class PFBChannelizer:
 
         self._input_npol = self.input_data.shape[2]
         self._input_nchan = self.input_data.shape[1]
-        self._input_ndim = 2 if np.all(np.iscomplex(self.input_data)) else 1
+        self._input_ndim = 2 if np.iscomplexobj(self.input_data) else 1
+
         self._input_ndat = self.input_data.shape[0]
         self._input_samples = 0
 
@@ -140,6 +141,11 @@ class PFBChannelizer:
 
         self._pfb_input_mask = None
         self._pfb_output_mask = None
+
+        self.logger.debug(
+            ("PFBChannelizer.__init__: input (ndat, nchan, npol, ndim) = "
+             f"({self._input_ndat}, {self._input_nchan}, "
+             f"{self._input_npol}, {self._input_ndim})"))
 
     def pad_fir_filter_coeff(self, nchan: int):
         fir_len = self.fir_filter_coeff.shape[0]
