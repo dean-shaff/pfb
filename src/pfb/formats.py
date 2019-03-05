@@ -165,6 +165,7 @@ class DADAFile(DataFile):
 
         self._load_data_from_file()
         self._data = self._shape_data(self._data).copy()
+        return self
 
     def dump_data(self, overwrite: bool = True) -> str:
 
