@@ -2,7 +2,7 @@
 
 from distutils.core import setup
 
-from src.pfb import __version__
+from pfb import __version__
 
 setup(
     name="pfb",
@@ -12,7 +12,6 @@ setup(
     author_email="dean.shaff@gmail.com",
     url="https://github.com/dean-shaff/pfb-channelizer",
     packages=["pfb"],
-    package_dir={"pfb": "src/pfb"},
     requires=[
         "numpy",
         "scipy",
