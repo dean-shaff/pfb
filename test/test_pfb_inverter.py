@@ -5,7 +5,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 
-from src.pfb.pfb_inverter import PFBInverter
+from pfb.pfb_inverter import PFBInverter
 
 current_dir = os.path.dirname(__file__)
 test_dir = os.path.join(current_dir, "test_data")

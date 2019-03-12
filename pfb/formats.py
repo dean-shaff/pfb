@@ -41,7 +41,7 @@ class DataFile:
 
     @header.setter
     def header(self, new_header: dict) -> None:
-        self._header = new_header
+        self._header = new_header.copy()
 
     @property
     def data(self) -> np.ndarray:

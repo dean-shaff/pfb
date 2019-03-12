@@ -3,7 +3,7 @@ import unittest
 
 import numpy as np
 
-from src.pfb import util
+from pfb import util
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 data_dir = os.path.join(current_dir, "test_data")

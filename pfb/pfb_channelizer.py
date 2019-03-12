@@ -214,17 +214,19 @@ class PFBChannelizer:
 
     def _init_output_data_file(self):
 
-        self.output_data_file = DADAFile(self.output_file_path)
+        self.logger.debug("_init_output_data_file")
 
-        os_factor = self.oversampling_factor
+        self.output_data_file = DADAFile(self.output_file_path)
 
         self.output_data_file['NDIM'] = 2
         self.output_data_file['NCHAN'] = self._output_nchan
         self.output_data_file['NPOL'] = self._output_npol
         self.output_data_file['TSAMP'] = self.calc_output_tsamp()
-        self.output_data_file['OS_FACTOR'] = f"{os_factor.nu}/{os_factor.de}"
 
     def _dump_data(self, data_file: DataFile):
+
+        os_factor = self.oversampling_factor
+        data_file.header["OS_FACTOR"] = f"{os_factor.nu}/{os_factor.de}"
         # add filter info to the data_file
         fir_info = [{
             "OVERSAMP": str(self.oversampling_factor),
@@ -233,7 +235,6 @@ class PFBChannelizer:
         }]
         data_file.header = add_filter_info_to_header(
             data_file.header, fir_info)
-
         data_file.dump_data()
 
     def _spiral_roll(self, arr: np.ndarray, n: int = None):

@@ -4,7 +4,7 @@ import logging
 
 import numpy as np
 
-from src.pfb.formats import DADAFile
+from pfb.formats import DADAFile
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 test_data_dir = os.path.join(current_dir, "test_data")
