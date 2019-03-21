@@ -134,7 +134,8 @@ class DADAFile(DataFile):
         "MODE": "PSR",
         "OBS_OFFSET": "0",
         "INSTRUMENT": "dspsr",
-        "DSB": "0"
+        "DSB": "0",
+        "PFB_DC_CHAN": "1"
     }
 
     def __init__(self, file_path: str):

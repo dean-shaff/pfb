@@ -227,6 +227,7 @@ class PFBChannelizer:
 
         os_factor = self.oversampling_factor
         data_file.header["OS_FACTOR"] = f"{os_factor.nu}/{os_factor.de}"
+        data_file.header["PFB_DC_CHAN"] = 1
         # add filter info to the data_file
         fir_info = [{
             "OVERSAMP": str(self.oversampling_factor),
