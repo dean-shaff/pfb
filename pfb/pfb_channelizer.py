@@ -4,6 +4,7 @@ import logging
 import argparse
 
 import numpy as np
+import scipy.fftpack
 import numba
 
 from .util import (
@@ -290,7 +291,7 @@ class PFBChannelizer:
 
             yield output_filtered
 
-            output_filtered_fft = (nchan**2)*np.fft.ifft(
+            output_filtered_fft = (nchan**2)*scipy.fftpack.ifft(
                 output_filtered, n=nchan, axis=1)
 
             self.output_data[:, :, p] = output_filtered_fft

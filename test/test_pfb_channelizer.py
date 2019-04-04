@@ -37,11 +37,11 @@ def compare_dump_files(file_path0, file_path1, **kwargs):
     min_size = int(np.amin(dat_sizes))
     comp_dat = [d[:min_size] for d in comp_dat]
 
-    # fig, axes = plt.subplots(3, 1)
-    # axes[0].plot(comp_dat[0])
-    # axes[1].plot(comp_dat[1])
-    # axes[2].plot(np.abs(np.subtract(*comp_dat)))
-    # plt.show()
+    fig, axes = plt.subplots(3, 1)
+    axes[0].plot(comp_dat[0])
+    axes[1].plot(comp_dat[1])
+    axes[2].plot(np.abs(np.subtract(*comp_dat)))
+    plt.show()
 
     return np.allclose(*comp_dat, **kwargs)
 
