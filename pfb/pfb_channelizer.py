@@ -365,21 +365,23 @@ class PFBChannelizer:
         self._dump_data(self.output_data_file)
 
     @staticmethod
-    def from_input_files(input_file_path: str, fir_file_path: str):
+    def from_input_files(input_file: psr_formats.DataFile,
+                         fir_file_path: str):
 
-        dada_file = psr_formats.DADAFile(input_file_path)
-        dada_file.load_data()
+        # dada_file = psr_formats.DADAFile(input_file_path)
+        if not input_file.loaded:
+            input_file.load_data()
         module_logger.debug(
             (f"PFBChannelizer.from_input_files: "
-             f"dada_file.ndat={dada_file.ndat}, "
-             f"dada_file.npol={dada_file.npol}, "
-             f"dada_file.ndim={dada_file.ndim}, "
-             f"dada_file.nchan={dada_file.nchan}"))
-        input_data = dada_file.data
+             f"input_file.ndat={input_file.ndat}, "
+             f"input_file.npol={input_file.npol}, "
+             f"input_file.ndim={input_file.ndim}, "
+             f"input_file.nchan={input_file.nchan}"))
+        input_data = input_file.data
         module_logger.debug(
             ("PFBChannelizer.from_input_files: "
              f"input_data.dtype={input_data.dtype}"))
-        input_tsamp = float(dada_file["TSAMP"])
+        input_tsamp = float(input_file["TSAMP"])
 
         fir_config, fir_filter_coef = load_matlab_filter_coef(fir_file_path)
 
@@ -437,10 +439,13 @@ if __name__ == "__main__":
     if parsed.input_file_path == "":
         raise RuntimeError("Need to provide a file to read")
 
+    input_file = psr_formats.DADAFile(parsed.input_file_path).load_data()
     channelizer = PFBChannelizer.from_input_files(
-        parsed.input_file_path,
+        input_file,
         parsed.fir_file_path
     )
 
     channelizer.channelize(parsed.channels, parsed.oversampling_factor)
-    channelizer.dump_file()
+    channelizer.dump_file(header_kwargs={
+        "UTC_START": input_file["UTC_START"]
+    })

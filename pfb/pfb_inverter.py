@@ -3,10 +3,6 @@ import time
 
 import numpy as np
 
-from .util import (
-    load_dada_file,
-    dump_dada_file
-)
 from .rational import Rational
 
 module_logger = logging.getLogger(__name__)

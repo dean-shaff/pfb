@@ -12,3 +12,10 @@ Note that Numpy will automatically upcast 32-bit data when applying
 ### v0.3.1
 
 - Separated channelizing from dumping data.
+- Added psr_formats dependency
+
+### v0.3.2
+
+- `PFBChannelizer.from_input_files` now takes a `psr_formats.DataFile` instead
+of a file path
+- Added unittest for running `PFBChannelizer.from_input_files`
