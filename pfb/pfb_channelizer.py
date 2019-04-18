@@ -6,13 +6,13 @@ import argparse
 import numpy as np
 import scipy.fftpack
 import numba
+import psr_formats
 
 from .util import (
     load_matlab_filter_coef,
     get_most_recent_data_file,
     add_filter_info_to_header
 )
-from .formats import DADAFile, DataFile
 from .rational import Rational
 
 module_logger = logging.getLogger(__name__)
@@ -217,14 +217,14 @@ class PFBChannelizer:
 
         self.logger.debug("_init_output_data_file")
 
-        self.output_data_file = DADAFile(self.output_file_path)
+        self.output_data_file = psr_formats.DADAFile(self.output_file_path)
 
         self.output_data_file['NDIM'] = 2
         self.output_data_file['NCHAN'] = self._output_nchan
         self.output_data_file['NPOL'] = self._output_npol
         self.output_data_file['TSAMP'] = self.calc_output_tsamp()
 
-    def _dump_data(self, data_file: DataFile):
+    def _dump_data(self, data_file: psr_formats.DataFile):
 
         os_factor = self.oversampling_factor
         data_file.header["OS_FACTOR"] = f"{os_factor.nu}/{os_factor.de}"
@@ -355,13 +355,19 @@ class PFBChannelizer:
 
         for i in g:
             pass
+
+    def dump_file(self, header_kwargs: dict = None):
+        if header_kwargs is None:
+            header_kwargs = {}
         self.output_data_file.data = self.output_data
+        for key in header_kwargs:
+            self.output_data_file[key] = header_kwargs[key]
         self._dump_data(self.output_data_file)
 
     @staticmethod
     def from_input_files(input_file_path: str, fir_file_path: str):
 
-        dada_file = DADAFile(input_file_path)
+        dada_file = psr_formats.DADAFile(input_file_path)
         dada_file.load_data()
         module_logger.debug(
             (f"PFBChannelizer.from_input_files: "
@@ -393,7 +399,7 @@ def create_parser():
     most_recent_data_file = ""
     try:
         most_recent_data_file = get_most_recent_data_file(data_dir)
-    except (IndexError, IOError) as err:
+    except (IndexError, IOError):
         pass
 
     parser = argparse.ArgumentParser(
@@ -437,3 +443,4 @@ if __name__ == "__main__":
     )
 
     channelizer.channelize(parsed.channels, parsed.oversampling_factor)
+    channelizer.dump_file()

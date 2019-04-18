@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pfb"
-version = "0.3.0"
+version = "0.3.1"
 description = ""
 authors = ["Dean Shaff <dshaff@swin.edu.au>"]
 
@@ -9,6 +9,7 @@ python = "^3.6"
 numpy = "^1.16"
 scipy = "^1.2"
 numba = "^0.42.1"
+psr-formats = {git = "git@github.com:dean-shaff/psr-formats.git"}
 
 [tool.poetry.dev-dependencies]
 matplotlib = "^3.0"
