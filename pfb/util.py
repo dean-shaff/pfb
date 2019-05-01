@@ -8,172 +8,79 @@ import scipy.io
 
 module_logger = logging.getLogger(__name__)
 
+
 __all__ = [
-    "load_dada_file",
-    "dump_dada_file",
-    "load_matlab_filter_coef",
-    "dump_filter_coef",
-    "get_most_recent_data_file"
+    "load_matlab_filter_coeff",
+    "complex_dtype_lookup",
+    "float_dtype_lookup"
+    "dtype_to_int"
 ]
 
-_float_dtype_map = {
-    '32': np.float32,
-    '64': np.float64
+dtype_to_int = {
+    np.dtype(np.float32): 1,
+    np.dtype(np.float64): 1,
+    np.dtype(np.complex64): 2,
+    np.dtype(np.complex128): 2
 }
 
-_complex_dtype_map = {
-    '32': np.complex64,
-    '64': np.complex128
+complex_dtype_lookup = {
+    np.dtype(np.float32): np.dtype(np.complex64),
+    np.dtype(np.float64): np.dtype(np.complex128),
+    np.dtype(np.complex64): np.dtype(np.complex64),
+    np.dtype(np.complex128): np.dtype(np.complex128)
 }
 
-_exclude_header_keys = ["COMPLEX_DTYPE", "FLOAT_DTYPE"]
+float_dtype_lookup = {
+    np.dtype(np.float32): np.dtype(np.float32),
+    np.dtype(np.float64): np.dtype(np.float64),
+    np.dtype(np.complex64): np.dtype(np.float32),
+    np.dtype(np.complex128): np.dtype(np.float64)
+}
 
 
-def _process_header(header_arr: np.ndarray) -> dict:
-    header_str = "".join([c.decode("UTF-8") for c in header_arr.tolist()])
-    lines = header_str.split("\n")
-    header = {}
-    for line in lines:
-        if line.startswith("#") or not line:
-            continue
-        else:
-            key, val = line.split()[:2]
-            header[key] = val
-    return header
-
-
-def load_dada_file(file_path: str) -> typing.List:
-    header_size = 4096  # smalled header size supported by DADA format
-    header_read = False
-    with open(file_path, "rb") as file:
-        buffer = file.read()
-
-    while not header_read:
-        header = np.frombuffer(
-            buffer, dtype='c', count=header_size
-        )
-        header = _process_header(header)
-        if "HDR_SIZE" in header:
-            new_header_size = int(header["HDR_SIZE"])
-            if new_header_size == header_size:
-                header_read = True
-            else:
-                header_size = new_header_size
-        else:
-            header_size *= 2
-
-    float_dtype = _float_dtype_map[str(header["NBIT"])]
-    complex_dtype = _complex_dtype_map[str(header["NBIT"])]
-    header["FLOAT_DTYPE"] = float_dtype
-    header["COMPLEX_DTYPE"] = complex_dtype
-    data = np.frombuffer(
-        buffer, dtype=float_dtype, offset=header_size
-    )
-    return [header, data]
-
-
-def add_filter_info_to_header(
-    header: dict,
+def filter_info_to_dict(
     filter_info: typing.List[dict]
 ) -> dict:
+    header = {}
     nstage = len(filter_info)
     header["NSTAGE"] = nstage
     for i in range(nstage):
-        filter_coef = filter_info[i]["COEFF"]
-        filter_coef_str = ",".join(
-            dump_filter_coef(filter_coef))
+        filter_coeff = filter_info[i]["COEFF"]
+        filter_coeff_str = ",".join(
+            filter_coeff_to_str(filter_coeff))
 
         header[f"OVERSAMP_{i}"] = filter_info[i]["OVERSAMP"]
-        header[f"NTAP_{i}"] = len(filter_coef)
-        header[f"COEFF_{i}"] = filter_coef_str
+        header[f"NTAP_{i}"] = len(filter_coeff)
+        header[f"COEFF_{i}"] = filter_coeff_str
         header[f"NCHAN_PFB_{i}"] = filter_info[i]["NCHAN_PFB"]
     return header
 
 
-def dump_dada_file(file_path: str,
-                   header: dict,
-                   data: np.ndarray) -> None:
-    module_logger.debug(f"dump_dada_file file_path: {file_path}")
-    module_logger.debug(f"dump_dada_file header: {header}")
-
-    def header_to_str(header: dict) -> str:
-        header_str = "\n".join(
-            [f"{key} {header[key]}" for key in header
-             if key not in _exclude_header_keys]) + "\n"
-        return header_str
-
-    header_size = int(header["HDR_SIZE"])
-    header_str = header_to_str(header)
-    header_len = len(header_str)
-    while header_size < header_len:
-        header_size *= 2
-        header["HDR_SIZE"] = header_size
-        header_str = header_to_str(header)
-        header_len = len(header_str)
-
-    header_bytes = str.encode(header_str)
-    remaining_bytes = header_size - len(header_bytes)
-    module_logger.debug(
-        f"dump_dada_file len(header_bytes): {len(header_bytes)}")
-    module_logger.debug(
-        f"dump_dada_file remaining_bytes: {remaining_bytes}")
-    header_bytes += str.encode(
-        "".join(["\0" for i in range(remaining_bytes)]))
-
-    assert len(header_bytes) == header_size, \
-        f"Number of bytes in header must be equal to {header_size}"
-
-    with open(file_path, "wb") as output_file:
-        output_file.write(header_bytes)
-        output_file.write(data.flatten().tobytes())
-
-    # module_logger.debug(
-    #     f"dump_dada_file Took {time.time() - t0:.4f} seconds to dump data")
-
-
-def load_matlab_filter_coef(file_path: str) -> typing.Tuple:
+def load_matlab_filter_coeff(file_path: str) -> typing.Tuple:
     fir_config = scipy.io.loadmat(file_path)
-    fir_filter_coef = fir_config["h"].reshape(-1)
-    return fir_config, fir_filter_coef
+    fir_filter_coeff = fir_config["h"].reshape(-1)
+    return fir_config, fir_filter_coeff
 
 
-def dump_filter_coef(filter_coef: np.ndarray) -> typing.List[str]:
+def filter_coeff_to_str(filter_coeff: np.ndarray) -> typing.List[str]:
     """
     Given some filter coefficients, dump them to ascii format.
 
     Returns:
         list: a list of strings
     """
-    filter_coef_as_ascii = ["{:.6E}".format(n) for n in filter_coef]
-    return filter_coef_as_ascii
+    filter_coeff_as_ascii = ["{:.6E}".format(n) for n in filter_coeff]
+    return filter_coeff_as_ascii
 
 
-def get_most_recent_data_file(directory: str,
-                              prefix: str = "simulated_pulsar",
-                              suffix: str = ".dump") -> str:
-
-    file_paths = []
-    for fname in os.listdir(directory):
-        if fname.startswith(prefix):
-            fpath = os.path.join(directory, fname)
-            file_paths.append(
-                (fpath,
-                 os.path.getmtime(fpath))
-            )
-
-    file_paths.sort(key=lambda x: x[1])
-
-    return file_paths[-1][0]
-
-
-def _add_fir_data_to_existing_file(
+def add_fir_data_to_existing_file(
     file_path: str,
     fir_file_path: str,
     os_factor: str,
     channels: int,
     overwrite: bool = False
 ) -> None:
-    _, coeff = load_matlab_filter_coef(fir_file_path)
+    _, coeff = load_matlab_filter_coeff(fir_file_path)
 
     fir_info = [{
         "COEFF": coeff,
@@ -183,7 +90,7 @@ def _add_fir_data_to_existing_file(
     }]
 
     header, data = load_dada_file(file_path)
-    header = add_filter_info_to_header(header, fir_info)
+    header.update(filter_info_to_dict(fir_info))
     output_file_path = file_path
     counter = 0
     if not overwrite:
@@ -238,7 +145,7 @@ if __name__ == "__main__":
     # logging.basicConfig(level=log_level)
     # logging.getLogger("matplotlib").setLevel(logging.ERROR)
 
-    _add_fir_data_to_existing_file(
+    add_fir_data_to_existing_file(
         parsed.input_file_path,
         parsed.fir_file_path,
         parsed.oversampling_factor,

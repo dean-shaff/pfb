@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pfb"
-version = "0.3.2"
+version = "0.4.0"
 description = ""
 authors = ["Dean Shaff <dshaff@swin.edu.au>"]
 
@@ -10,6 +10,8 @@ numpy = "^1.16"
 scipy = "^1.2"
 numba = "^0.42.1"
 psr-formats = {git = "git@github.com:dean-shaff/psr-formats.git"}
+partialize = {git = "git@github.com:dean-shaff/partialize.git"}
+comparator = {git = "git@github.com:dean-shaff/comparator.git"}
 
 [tool.poetry.dev-dependencies]
 matplotlib = "^3.0"

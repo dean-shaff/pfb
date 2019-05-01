@@ -7,9 +7,10 @@ import numpy as np
 import scipy.fftpack
 import numba
 import psr_formats
+import partialize
 
 from .util import (
-    load_matlab_filter_coef,
+    load_matlab_filter_coeff,
     get_most_recent_data_file,
     add_filter_info_to_header
 )
@@ -18,55 +19,66 @@ from .rational import Rational
 module_logger = logging.getLogger(__name__)
 
 
+__all__ = [
+    "PFBChannelizer"
+]
+
+
 @numba.njit(cache=True, fastmath=True)
-def apply_filter(signal: np.ndarray,
-                 filter_coef: np.ndarray,
-                 filtered: np.ndarray,
-                 downsample_by: int,
-                 increment_by: int = None) -> np.ndarray:
+def _apply_filter(signal: np.ndarray,
+                  filter_coeff: np.ndarray,
+                  filtered: np.ndarray,
+                  downsample_by: int,
+                  increment_by: int = None,
+                  input_padding: int = None) -> np.ndarray:
     """
-    filter signal with filter_coef.
+    filter signal with filter_coeff.
+
+    Assumes filter_coeff is already padded appropriately
 
     Implementation is a little strange from a numpy perspective, as numba
     doesn't support 2d boolean array indexing.
+
+    Args:
+        signal
+        filter_coeff
+        filtered
+        downsample_by
+        increment_by
+        input_padding
+
+    Returns:
+        np.ndarray
+
     """
     if increment_by is None:
         increment_by = downsample_by
-    init_filter_size = filter_coef.shape[0]
-    # print(f"init_filter_size: {init_filter_size}")
-    filter_dtype = filter_coef.dtype
+
+    filter_dtype = filter_coeff.dtype
     signal_dtype = signal.dtype
+
     is_real = True
     if signal_dtype is np.complex64:
         is_real = False
 
-    rem = init_filter_size % downsample_by
-    # print(f"rem: {rem}")
-    if rem != 0:
-        filter_coef_padded = np.zeros(
-            (init_filter_size + downsample_by - rem),
-            dtype=filter_dtype
-        )
-        # print(filter_coef_padded.shape)
-        # filter_coef_padded[init_filter_size:] = filter_coef
-        filter_coef_padded[:init_filter_size] = filter_coef
-        filter_coef = filter_coef_padded
-
-    window_size = filter_coef.shape[0]
+    window_size = filter_coeff.shape[0]
 
     down_sample_filter_elem = int(window_size / downsample_by)
     filter_idx = np.arange(window_size).reshape(
         (down_sample_filter_elem, downsample_by))
-    # filter_coeff_2d = filter_coef[filter_idx]
+    # filter_coeff_2d = filter_coeff[filter_idx]
     filter_coeff_2d = np.zeros(filter_idx.shape, dtype=filter_dtype)
     for i in range(downsample_by):
-        filter_coeff_2d[:, i] = filter_coef[filter_idx[:, i]]
+        filter_coeff_2d[:, i] = filter_coeff[filter_idx[:, i]]
+
+    if input_padding is None:
+        input_padding = window_size
 
     signal_padded = np.zeros(
-        (window_size + signal.shape[0]),
+        (input_padding + signal.shape[0]),
         dtype=signal_dtype
     )
-    signal_padded[window_size:] = signal
+    signal_padded[input_padding:] = signal
 
     down_sample_signal_elem = filtered.shape[0]
     signal_chunk_2d = np.zeros(filter_idx.shape, dtype=signal_dtype)
@@ -88,6 +100,15 @@ def apply_filter(signal: np.ndarray,
             )
 
     return filtered
+
+
+@partialize.partialize
+def pfb_analysis(input_data: np.ndarray,
+                 *,
+                 fir_filter_coeff: np.ndarray = None,
+                 os_factor: str = None,
+                 ):
+
 
 
 class PFBChannelizer:
@@ -113,7 +134,7 @@ class PFBChannelizer:
         if np.iscomplexobj(self.input_data):
             self._complex_dtype = self.input_data.dtype
             self._float_dtype = (np.float32 if
-                                 self._complex_dtype == np.float32
+                                 self._complex_dtype == np.complex64
                                  else np.float64)
 
         else:
@@ -274,7 +295,8 @@ class PFBChannelizer:
                 self._fir_filter_coeff_padded,
                 output_filtered,
                 nchan,
-                nchan_norm
+                increment_by=nchan_norm,
+                input_padding=int(self.fir_filter_coeff.shape[0]/2)
             )
 
             self.logger.debug(
@@ -291,8 +313,11 @@ class PFBChannelizer:
 
             yield output_filtered
 
-            output_filtered_fft = (nchan**2)*scipy.fftpack.ifft(
+            output_filtered_fft = nchan*scipy.fftpack.fft(
                 output_filtered, n=nchan, axis=1)
+            #
+            # output_filtered_fft = (nchan**2)*scipy.fftpack.ifft(
+            #     output_filtered, n=nchan, axis=1)
 
             self.output_data[:, :, p] = output_filtered_fft
 
@@ -383,9 +408,9 @@ class PFBChannelizer:
              f"input_data.dtype={input_data.dtype}"))
         input_tsamp = float(input_file["TSAMP"])
 
-        fir_config, fir_filter_coef = load_matlab_filter_coef(fir_file_path)
+        fir_config, fir_filter_coeff = load_matlab_filter_coeff(fir_file_path)
 
-        channelizer = PFBChannelizer(input_data, fir_filter_coef, input_tsamp)
+        channelizer = PFBChannelizer(input_data, fir_filter_coeff, input_tsamp)
 
         return channelizer
 
