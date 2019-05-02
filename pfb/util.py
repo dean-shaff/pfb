@@ -8,13 +8,13 @@ import scipy.io
 
 module_logger = logging.getLogger(__name__)
 
-
 __all__ = [
     "load_matlab_filter_coeff",
     "complex_dtype_lookup",
     "float_dtype_lookup"
     "dtype_to_int"
 ]
+
 
 dtype_to_int = {
     np.dtype(np.float32): 1,

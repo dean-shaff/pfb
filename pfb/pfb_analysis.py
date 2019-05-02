@@ -1,7 +1,4 @@
-import os
-import time
 import logging
-import argparse
 import typing
 
 import numpy as np
@@ -9,13 +6,7 @@ import scipy.fftpack
 import numba
 import partialize
 
-from .util import (
-    complex_dtype_lookup,
-    dtype_to_int,
-    filter_info_to_dict,
-    load_matlab_filter_coeff
-)
-from .rational import Rational
+from . import util, rational
 
 module_logger = logging.getLogger(__name__)
 
@@ -142,7 +133,7 @@ def calc_output_tsamp(input_tsamp: float,
                       *,
                       nchan: int,
                       os_factor: typing.Any) -> float:
-    os_factor = Rational.from_str(os_factor)
+    os_factor = rational.Rational.from_str(os_factor)
     ndim_ratio = int(output_ndim / input_ndim)
     output_tsamp = float(input_tsamp * ndim_ratio * nchan *
                          os_factor.de / os_factor.nu)
@@ -159,10 +150,10 @@ def pfb_analysis(input_data: np.ndarray,
     Do pfb analysis on single channel input data. Does not handle
     multiple polarizations at once.
     """
-    os_factor = Rational.from_str(os_factor)
+    os_factor = rational.Rational.from_str(os_factor)
 
     input_dtype = input_data.dtype
-    output_dtype = complex_dtype_lookup[input_dtype]
+    output_dtype = util.complex_dtype_lookup[input_dtype]
 
     module_logger.debug(f"pfb_analysis: input_data.shape={input_data.shape}")
     module_logger.debug(f"pfb_analysis: fir_filter_coeff.shape={fir_filter_coeff.shape}")
@@ -176,6 +167,10 @@ def pfb_analysis(input_data: np.ndarray,
 
     output_samples = int(ndat_input / nchan_norm)
     input_samples = output_samples * nchan_norm
+
+    module_logger.debug(f"pfb_analysis: input_samples={input_samples}")
+    module_logger.debug(f"pfb_analysis: output_samples={output_samples}")
+
 
     fir_filter_coeff_padded = _pad_filter(fir_filter_coeff, nchan)
 
@@ -219,114 +214,57 @@ def pfb_analysis(input_data: np.ndarray,
 
     return output_filtered_fft
 
-@partialize.partialize
-def channelize_psrformat_file(input_file: typing.Any,
-                              *,
-                              output_dir: str,
-                              output_file_name: str,
-                              fir_filter_coeff: typing.Any,
-                              nchan: int,
-                              os_factor: typing.Any):
 
-    if not input_file.loaded:
-        input_file.load_data()
-
-    os_factor = Rational.from_str(os_factor)
-    if hasattr(fir_filter_coeff, "format"):
-        fir_filter_coeff = load_matlab_filter_coeff(fir_filter_coeff)[1]
-
-    data_file_cls = type(input_file)
-    output_file_path = os.path.join(output_dir, output_file_name)
-    output_file = data_file_cls(output_file_path)
-    output_file.header = input_file.header.copy()
-
-    output_file["TSAMP"] = calc_output_tsamp(
-        float(input_file["TSAMP"]),
-        input_ndim=dtype_to_int[input_file.data.dtype],
-        output_ndim=2,
-        nchan=nchan,
-        os_factor=os_factor
-    )
-
-    output_file.header["OS_FACTOR"] = str(os_factor)
-    output_file.header["PFB_DC_CHAN"] = 1
-    # add filter info to the output_file
-    fir_info = [{
-        "OVERSAMP": str(os_factor),
-        "COEFF": fir_filter_coeff,
-        "NCHAN_PFB": nchan
-    }]
-    output_file.header.update(filter_info_to_dict(fir_info))
-
-    channelizer = pfb_analysis(
-        fir_filter_coeff=fir_filter_coeff,
-        os_factor=os_factor,
-        nchan=nchan
-    )
-    n_pol = input_file.data.shape[-1]
-    output_data = np.expand_dims(channelizer(input_file.data[:, 0, 0]), axis=2)
-    for i_pol in range(1, n_pol):
-        output_ipol = np.expand_dims(
-            channelizer(input_file.data[:, 0, i_pol]), axis=2)
-        output_data = np.concatenate((output_data, output_ipol), axis=2)
-
-    output_file.data = output_data
-    output_file.dump_data()
-
-    return output_file
-
-
-
-def create_parser():
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-
-    config_dir = os.getenv("PFB_CONFIG_DIR",
-                           os.path.join(current_dir, "config"))
-    data_dir = os.getenv("PFB_DATA_DIR",
-                         os.path.join(current_dir, "data"))
-
-    parser = argparse.ArgumentParser(
-        description="channelize data")
-
-    parser.add_argument("-i", "--input-file",
-                        dest="input_file_path",
-                        required=True)
-
-    parser.add_argument("-f", "--fir-file",
-                        dest="fir_file_path",
-                        default=os.path.join(config_dir,
-                                             "OS_Prototype_FIR_8.mat"))
-
-    parser.add_argument("-v", "--verbose",
-                        dest="verbose", action="store_true")
-
-    parser.add_argument("-c", "--channels",
-                        dest="channels", default=8, type=int)
-
-    parser.add_argument("-os", "--os_factor",
-                        dest="os_factor", default="1/1", type=str)
-
-    return parser
-
-
-if __name__ == "__main__":
-    parsed = create_parser().parse_args()
-    log_level = logging.INFO
-    if parsed.verbose:
-        log_level = logging.DEBUG
-
-    logging.basicConfig(level=log_level)
-    logging.getLogger("matplotlib").setLevel(logging.ERROR)
-    if parsed.input_file_path == "":
-        raise RuntimeError("Need to provide a file to read")
-
-    input_file = psr_formats.DADAFile(parsed.input_file_path).load_data()
-    channelizer = PFBChannelizer.from_input_files(
-        input_file,
-        parsed.fir_file_path
-    )
-
-    channelizer.channelize(parsed.channels, parsed.os_factor)
-    channelizer.dump_file(header_kwargs={
-        "UTC_START": input_file["UTC_START"]
-    })
+# def create_parser():
+#     current_dir = os.path.dirname(os.path.abspath(__file__))
+#
+#     config_dir = os.getenv("PFB_CONFIG_DIR",
+#                            os.path.join(current_dir, "config"))
+#     data_dir = os.getenv("PFB_DATA_DIR",
+#                          os.path.join(current_dir, "data"))
+#
+#     parser = argparse.ArgumentParser(
+#         description="channelize data")
+#
+#     parser.add_argument("-i", "--input-file",
+#                         dest="input_file_path",
+#                         required=True)
+#
+#     parser.add_argument("-f", "--fir-file",
+#                         dest="fir_file_path",
+#                         default=os.path.join(config_dir,
+#                                              "OS_Prototype_FIR_8.mat"))
+#
+#     parser.add_argument("-v", "--verbose",
+#                         dest="verbose", action="store_true")
+#
+#     parser.add_argument("-c", "--channels",
+#                         dest="channels", default=8, type=int)
+#
+#     parser.add_argument("-os", "--os_factor",
+#                         dest="os_factor", default="1/1", type=str)
+#
+#     return parser
+#
+#
+# if __name__ == "__main__":
+#     parsed = create_parser().parse_args()
+#     log_level = logging.INFO
+#     if parsed.verbose:
+#         log_level = logging.DEBUG
+#
+#     logging.basicConfig(level=log_level)
+#     logging.getLogger("matplotlib").setLevel(logging.ERROR)
+#     if parsed.input_file_path == "":
+#         raise RuntimeError("Need to provide a file to read")
+#
+#     input_file = psr_formats.DADAFile(parsed.input_file_path).load_data()
+#     channelizer = PFBChannelizer.from_input_files(
+#         input_file,
+#         parsed.fir_file_path
+#     )
+#
+#     channelizer.channelize(parsed.channels, parsed.os_factor)
+#     channelizer.dump_file(header_kwargs={
+#         "UTC_START": input_file["UTC_START"]
+#     })
