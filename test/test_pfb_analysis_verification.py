@@ -16,13 +16,16 @@ data_dir = os.path.join(current_dir, "test_data")
 fir_file_path = os.path.join(
     data_dir, "Prototype_FIR.8-7.8.80.mat")
 
+# data_dir = ("/home/SWIN/dshaff/mnt/ozstar/projects/"
+#             "PST_Matlab_dspsr_PFB_inversion_comparison/data")
+
 input_file_paths = [os.path.join(data_dir, file_name) for file_name in
-                    ["complex_sinusoid.dump"]]
-                    #  "time_domain_impulse.dump"]]
+                    ["complex_sinusoid.dump",
+                     "time_domain_impulse.dump"]]
 
 matlab_file_paths = [os.path.join(data_dir, file_name) for file_name in
-                     ["polyphase_analysis.complex_sinusoid.dump"]]
-                    #  "polyphase_analysis.time_domain_impulse.dump"]]
+                     ["polyphase_analysis.complex_sinusoid.dump",
+                      "polyphase_analysis.time_domain_impulse.dump"]]
 
 nchan = 8
 os_factor = Rational.from_str("8/7")
@@ -61,14 +64,25 @@ class TestPFBAnalysisValidation(unittest.TestCase):
                 output_dir=data_dir,
                 output_file_name=f"pfb_analysis.{input_file_name}",
             )
-            self._detailed_comparison(matlab_file, output_file)
 
-            # res_op, res_prod = self.comp.polar(*[
-            #     matlab_file.data.flatten(), output_file.data.flatten()
-            # ])
-            # fig, axes = comparator.plot_operator_result(res_op)
-            #
-            # plt.show()
+            allclose = np.allclose(
+                matlab_file.data.flatten(),
+                output_file.data.flatten(),
+                atol=1e-5
+            )
+
+            if not allclose:
+                self._detailed_comparison(matlab_file, output_file)
+                plt.show()
+
+            self.assertTrue(allclose)
+
+    def _plot_input_data(self, input_file):
+
+        fig, axes = plt.subplots(1, 1)
+        axes.plot(input_file.data[:, 0, 0].real)
+        axes.plot(input_file.data[:, 0, 0].imag)
+        axes.set_title('Input data')
 
     def _detailed_comparison(self, expected_file, test_file):
 
@@ -89,8 +103,8 @@ class TestPFBAnalysisValidation(unittest.TestCase):
         print(test_file.data.shape)
 
         for ichan in range(nchan):
-            e_ichan = expected_file.data[:, ichan, 0][:100]
-            t_ichan = test_file.data[:, ichan, 0][:100]
+            e_ichan = expected_file.data[:, ichan, 0][:]
+            t_ichan = test_file.data[:, ichan, 0][:]
             axes[ichan, 0].plot(z1(e_ichan))
             axes[ichan, 1].plot(z1(t_ichan))
             axes[ichan, 2].plot(np.abs(z1(t_ichan) - z1(e_ichan)))
@@ -102,8 +116,6 @@ class TestPFBAnalysisValidation(unittest.TestCase):
             for i in range(6):
                 # axes[ichan, i].set_xlim([0, 100])
                 axes[ichan, i].grid(True)
-
-        plt.show()
 
 
 if __name__ == '__main__':
