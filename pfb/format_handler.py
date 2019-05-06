@@ -8,9 +8,7 @@ import psr_formats
 from . import util
 from .pfb_analysis import pfb_analysis, calc_output_tsamp
 from .rational import Rational
-
-fir_filter_coeff_type = typing.Union[str, np.ndarray]
-os_factor_type = typing.Union[str, Rational]
+from .util import fir_filter_coeff_type, os_factor_type
 
 
 class FormatHandler:

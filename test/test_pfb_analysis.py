@@ -13,8 +13,9 @@ class TestPFBAnalysis(unittest.TestCase):
     def test_pfb_analysis(self):
         analyzer = pfb_analysis(os_factor="8/7",
                                 nchan=8,
-                                fir_filter_coeff=np.random.rand(10))
-        sample_data = np.random.rand(1000) + 1j*np.random.rand(1000)
+                                fir_filter_coeff=np.random.rand(88))
+        ndat = int(1e6)
+        sample_data = np.random.rand(ndat) + 1j*np.random.rand(ndat)
         analyzer(sample_data)
 
     def test_calc_output_tsamp(self):

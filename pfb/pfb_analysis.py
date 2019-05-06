@@ -52,14 +52,13 @@ def _pad_filter(filter_coeff: np.ndarray,
     return filter_coeff
 
 
-@numba.njit(cache=True)
+@numba.njit(cache=True, fastmath=True)
 def _apply_filter(signal: np.ndarray,
                   filter_coeff: np.ndarray,
                   filtered: np.ndarray,
                   downsample_by: int,
                   signal_is_real: bool = False,
-                  increment_by: int = None,
-                  input_padding: int = None) -> np.ndarray:
+                  increment_by: int = None) -> np.ndarray:
     """
     filter signal with filter_coeff.
 
@@ -83,67 +82,29 @@ def _apply_filter(signal: np.ndarray,
     if increment_by is None:
         increment_by = downsample_by
 
-    if input_padding is None:
-        input_padding = int(filter_coeff.shape[0] / 2)
-
-    # filter_dtype = filter_coeff.dtype
-    signal_dtype = signal.dtype
-
     window_size = filter_coeff.shape[0]
 
     down_sample_filter_elem = int(window_size / downsample_by)
-    # filter_idx = np.arange(window_size).reshape(
-    #     (down_sample_filter_elem, downsample_by))
-    #
-    # filter_coeff_2d = filter_coeff.reshape(
-    #     (down_sample_filter_elem, downsample_by))
 
-    # print(filter_coeff)
-    # print(filter_idx)
-    # filter_coeff_2d = filter_coeff[filter_idx]
-    # filter_coeff_2d = np.zeros(filter_idx.shape, dtype=filter_dtype)
-    # for i in range(downsample_by):
-    #     filter_coeff_2d[:, i] = filter_coeff[filter_idx[:, i]]
-
-    signal_padded = np.zeros(
-        (input_padding + signal.shape[0]),
-        dtype=signal_dtype
-    )
-    signal_padded[input_padding:] = signal
     down_sample_signal_elem = filtered.shape[0]
-    # signal_chunk_2d = np.zeros(filter_idx.shape, dtype=signal_dtype)
+
+    # roll_idx = np.arange(down_sample_signal_elem)*increment_by
+    # roll_idx -= (roll_idx//downsample_by)*downsample_by
 
     for i in range(down_sample_signal_elem):
         idx = i*increment_by
-        signal_chunk = signal_padded[idx:idx + window_size]
+        signal_chunk = signal[idx:idx + window_size]
         filtered_i = signal_chunk * filter_coeff
-        index = int(idx - (idx//downsample_by)*downsample_by)
-        filtered_i = np.roll(filtered_i, index)
         # if signal_is_real:
         #     filtered_i = signal_chunk * filter_coeff
         # else:
-        #     filtered_i = signal_chunk.real * filter_coeff + signal_chunk.imag * filter_coeff
+        #     filtered_i = (signal_chunk.real * filter_coeff +
+        #                   1j*signal_chunk.imag * filter_coeff)
+        index = int(idx - (idx//downsample_by)*downsample_by)
+        filtered_i = np.roll(filtered_i, index)
         filtered[i, :] = np.sum(filtered_i.reshape((
             down_sample_filter_elem, downsample_by
         )), axis=0)
-        # signal_chunk_2d = signal_padded[idx:idx + window_size].reshape(
-        #     (down_sample_filter_elem, downsample_by)) #[::-1]
-        # signal_chunk_2d = signal_chunk.reshape(
-        #     (down_sample_filter_elem, downsample_by))
-        # for j in range(downsample_by):
-        #     signal_chunk_2d[:, j] = signal_chunk[filter_idx[:, j]]
-
-        # if signal_is_real:
-        #     filtered[i, :] = np.sum(signal_chunk_2d * filter_coeff_2d, axis=0)
-        # else:
-        #     filtered[i, :] = (
-        #         np.sum(signal_chunk_2d.real * filter_coeff_2d, axis=0) +
-        #         1j*np.sum(signal_chunk_2d.imag * filter_coeff_2d, axis=0)
-        #     )
-
-        # filtered[i,:] = np.sum(
-        #   signal_chunk[filter_idx] * filter_coeff_2d, axis=0)
-
 
     return filtered
 
@@ -202,35 +163,23 @@ def pfb_analysis(input_data: np.ndarray,
         nchan
     ), dtype=output_dtype)
 
-    # t0 = time.time()
+    t0 = time.time()
     output_filtered = _apply_filter(
         input_data,
         fir_filter_coeff_padded,
         output_filtered,
         nchan,
         signal_is_real=not np.iscomplexobj(input_data),
-        increment_by=nchan_norm,
-        input_padding=0
+        increment_by=nchan_norm
     )
 
-    # module_logger.debug(
-    #     (f"pfb_analysis: "
-    #      f"Call to filter took {time.time()-t0:.4f} seconds"))
-
-    # if float(os_factor) > 1.0:
-    #     t0 = time.time()
-    #     output_filtered = _spiral_roll(output_filtered, nchan)
-    #     module_logger.debug(
-    #         (f"pfb_analysis: "
-    #          f"Shifting array took {time.time()-t0:.4f} seconds"))
-    #     pass
-    # yield output_filtered
+    module_logger.debug(
+        (f"pfb_analysis: "
+         f"Call to filter took {time.time()-t0:.4f} seconds"))
 
     output_filtered_fft = nchan*scipy.fftpack.fft(
         output_filtered, n=nchan, axis=1)
 
-    # output_filtered_fft = (nchan**2)*scipy.fftpack.ifft(
-    #     output_filtered, n=nchan, axis=1)
     module_logger.debug(
         (f"pfb_analysis: "
          f"Took {time.time() - t_total:.4f} seconds to channelize"))
