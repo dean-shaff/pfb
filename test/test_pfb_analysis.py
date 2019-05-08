@@ -18,6 +18,9 @@ class TestPFBAnalysis(unittest.TestCase):
         sample_data = np.random.rand(ndat) + 1j*np.random.rand(ndat)
         analyzer(sample_data)
 
+        for i in range(10):
+            analyzer(sample_data)
+
     def test_calc_output_tsamp(self):
         input_tsamp = 0.025
         output_tsamp = calc_output_tsamp(input_tsamp,

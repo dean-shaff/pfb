@@ -1,9 +1,12 @@
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
-from .format_handler import PSRFormatChannelizer
-from .pfb_analysis import pfb_analysis
+from .format_handler import PSRFormatChannelizer, PSRFormatSynthesizer
+from .pfb_analysis import pfb_analyze
+from .pfb_synthesis import pfb_synthesize
 
 __all__ = [
     "PSRFormatChannelizer",
-    "pfb_analysis"
+    "PSRFormatSynthesizer",
+    "pfb_analyze",
+    "pfb_synthesize"
 ]

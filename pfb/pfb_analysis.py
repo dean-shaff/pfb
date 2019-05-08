@@ -13,7 +13,7 @@ module_logger = logging.getLogger(__name__)
 
 
 __all__ = [
-    "pfb_analysis",
+    "pfb_analyze",
     "calc_output_tsamp"
 ]
 
@@ -52,7 +52,7 @@ def _pad_filter(filter_coeff: np.ndarray,
     return filter_coeff
 
 
-@numba.njit(cache=True, fastmath=True)
+@numba.njit(cache=True)
 def _apply_filter(signal: np.ndarray,
                   filter_coeff: np.ndarray,
                   filtered: np.ndarray,
@@ -115,7 +115,7 @@ def calc_output_tsamp(input_tsamp: float,
                       output_ndim: int = 2,
                       *,
                       nchan: int,
-                      os_factor: typing.Any) -> float:
+                      os_factor: util.os_factor_type) -> float:
     os_factor = rational.Rational.from_str(os_factor)
     ndim_ratio = int(output_ndim / input_ndim)
     output_tsamp = float(input_tsamp * ndim_ratio * nchan *
@@ -124,11 +124,11 @@ def calc_output_tsamp(input_tsamp: float,
 
 
 @partialize.partialize
-def pfb_analysis(input_data: np.ndarray,
-                 *,
-                 fir_filter_coeff: np.ndarray,
-                 nchan: int,
-                 os_factor: typing.Any):
+def pfb_analyze(input_data: np.ndarray,
+                *,
+                fir_filter_coeff: np.ndarray,
+                nchan: int,
+                os_factor: typing.Any):
     """
     Do pfb analysis on single channel input data. Does not handle
     multiple polarizations at once.
@@ -138,14 +138,14 @@ def pfb_analysis(input_data: np.ndarray,
     input_dtype = input_data.dtype
     output_dtype = util.complex_dtype_lookup[input_dtype]
 
-    module_logger.debug(f"pfb_analysis: input_data.shape={input_data.shape}")
-    module_logger.debug(f"pfb_analysis: fir_filter_coeff.shape={fir_filter_coeff.shape}")
-    module_logger.debug(f"pfb_analysis: nchan={nchan}")
-    module_logger.debug(f"pfb_analysis: os_factor={os_factor}")
+    module_logger.debug(f"pfb_analyze: input_data.shape={input_data.shape}")
+    module_logger.debug(f"pfb_analyze: fir_filter_coeff.shape={fir_filter_coeff.shape}")
+    module_logger.debug(f"pfb_analyze: nchan={nchan}")
+    module_logger.debug(f"pfb_analyze: os_factor={os_factor}")
 
     t_total = time.time()
     fir_filter_coeff_padded = _pad_filter(fir_filter_coeff, nchan)
-    module_logger.debug((f"pfb_analysis: fir_filter_coeff_padded.shape="
+    module_logger.debug((f"pfb_analyze: fir_filter_coeff_padded.shape="
                          f"{fir_filter_coeff_padded.shape}"))
 
     ndat_input = input_data.shape[0]
@@ -155,8 +155,8 @@ def pfb_analysis(input_data: np.ndarray,
         (ndat_input - fir_filter_coeff_padded.shape[0]) / nchan_norm)
     input_samples = output_samples * nchan_norm
 
-    module_logger.debug(f"pfb_analysis: input_samples={input_samples}")
-    module_logger.debug(f"pfb_analysis: output_samples={output_samples}")
+    module_logger.debug(f"pfb_analyze: input_samples={input_samples}")
+    module_logger.debug(f"pfb_analyze: output_samples={output_samples}")
 
     output_filtered = np.zeros((
         output_samples,
@@ -174,14 +174,14 @@ def pfb_analysis(input_data: np.ndarray,
     )
 
     module_logger.debug(
-        (f"pfb_analysis: "
+        (f"pfb_analyze: "
          f"Call to filter took {time.time()-t0:.4f} seconds"))
 
     output_filtered_fft = nchan*scipy.fftpack.fft(
         output_filtered, n=nchan, axis=1)
 
     module_logger.debug(
-        (f"pfb_analysis: "
+        (f"pfb_analyze: "
          f"Took {time.time() - t_total:.4f} seconds to channelize"))
 
     return output_filtered_fft

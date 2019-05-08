@@ -17,7 +17,8 @@ __all__ = [
     "os_factor_type",
     "filter_info_to_dict",
     "load_matlab_filter_coeff",
-    "filter_coeff_to_str"
+    "filter_coeff_to_str",
+    "str_to_filter_coeff"
 ]
 
 
@@ -44,6 +45,7 @@ float_dtype_lookup = {
 
 fir_filter_coeff_type = typing.Union[str, np.ndarray]
 os_factor_type = typing.Union[str, Rational]
+overlap_type = typing.Union[int, typing.Callable]
 
 
 def filter_info_to_dict(
@@ -79,6 +81,15 @@ def filter_coeff_to_str(filter_coeff: np.ndarray) -> typing.List[str]:
     """
     filter_coeff_as_ascii = ["{:.6E}".format(n) for n in filter_coeff]
     return filter_coeff_as_ascii
+
+
+def str_to_filter_coeff(filter_coeff_str: str, delimiter: str = ",") -> np.ndarray:
+    """
+    Given some filter coefficients, represented as a string of ascii numbers,
+    create a numpy array.
+    """
+    filter_coeff = [float(s) for s in filter_coeff_str.split(delimiter)]
+    return np.ndarray(filter_coeff)
 
 
 # def add_fir_data_to_existing_file(
