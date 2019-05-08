@@ -19,3 +19,15 @@ Note that Numpy will automatically upcast 32-bit data when applying
 - `PFBChannelizer.from_input_files` now takes a `psr_formats.DataFile` instead
 of a file path
 - Added unittest for running `PFBChannelizer.from_input_files`
+
+### v0.4.0
+
+- Complete refactor. API is totally different. The code that computes the PFB
+is its own function, with no dada wrangling wrapping.
+- Added `format_handler.py` which defines a base class that is used to load
+in input data, apply a transform, and then save to an output data file
+
+### v0.5.0
+
+- Added very basic, untested PFB inversion implementation, with suitable
+subclass of `format_handler.FormatHandler` to load in real DADA data.
