@@ -31,3 +31,10 @@ in input data, apply a transform, and then save to an output data file
 
 - Added very basic, untested PFB inversion implementation, with suitable
 subclass of `format_handler.FormatHandler` to load in real DADA data.
+
+### v0.5.1
+
+- `format_handler.PSRFormatChannelizer` now copies `UTC_START` field from input
+to channelized file
+- `format_handler.PSRFormatSynthesizer` also copies `UTC_START` from input
+to output file.

@@ -103,7 +103,7 @@ class PSRFormatChannelizer(PSRFormatHandler):
             nchan=self.nchan,
             os_factor=self.os_factor
         )
-
+        output_file["UTC_START"] = input_file["UTC_START"]
         output_file.header["OS_FACTOR"] = str(self.os_factor)
         output_file.header["PFB_DC_CHAN"] = 1
         # add filter info to the output_file
@@ -186,6 +186,7 @@ class PSRFormatSynthesizer(PSRFormatHandler):
             nchan=self.nchan,
             os_factor=self.os_factor
         )
+        output_file["UTC_START"] = input_file["UTC_START"]
 
         return output_file
 
