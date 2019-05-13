@@ -2,6 +2,7 @@ import logging
 
 import numpy as np
 import scipy.fftpack
+import scipy.signal
 import partialize
 
 from . import util
@@ -33,6 +34,7 @@ def calc_input_tsamp(output_tsamp: float,
 def pfb_synthesize(input_data: np.ndarray,
                    input_fft_length: int = 1024,
                    input_overlap: util.overlap_type = None,
+                   fft_window: np.ndarray = None,
                    *,
                    fir_filter_coeff: np.ndarray,
                    apply_deripple: bool,
@@ -53,11 +55,16 @@ def pfb_synthesize(input_data: np.ndarray,
         if hasattr(input_overlap, "__call__"):
             input_overlap = input_overlap(input_fft_length)
 
+    if fft_window is None:
+        fft_window = np.ones((input_fft_length, 1))
+
     output_overlap = os_factor.normalize(input_overlap)*nchan
     output_overlap_slice = slice(0, None)
     if output_overlap != 0:
         output_overlap_slice = slice(output_overlap, -output_overlap)
+
     input_os_keep = os_factor.normalize(input_fft_length)
+    input_os_keep_2 = int(input_os_keep/2)
     input_os_discard = int((input_fft_length - input_os_keep)/2)
     input_keep = input_fft_length - 2*input_overlap
 
@@ -65,6 +72,18 @@ def pfb_synthesize(input_data: np.ndarray,
     output_keep = output_fft_length - 2*output_overlap
 
     nblocks = int(ndat / input_fft_length)
+
+    filter_response_len = nchan*input_os_keep_2
+    filter_response = np.ones(output_fft_length)
+    if apply_deripple:
+        h = np.abs(scipy.signal.freqz(
+            fir_filter_coeff.flatten(), 1, filter_response_len)[1])
+        h = h[:input_os_keep_2]
+        intra_channel_response = np.append(h[::-1], h)
+        inter_channel_response = np.tile(intra_channel_response, nchan)
+        inter_channel_response = np.roll(
+            inter_channel_response, -input_os_keep_2)
+        filter_response /= inter_channel_response
 
     module_logger.debug(f"pfb_synthesize: input_overlap={input_overlap}")
     module_logger.debug(f"pfb_synthesize: output_overlap={output_overlap}")
@@ -87,13 +106,13 @@ def pfb_synthesize(input_data: np.ndarray,
         chunk = input_data[input_slice_start:input_slice_stop, :]
         chunk_fft = np.fft.fftshift(
             scipy.fftpack.fft(chunk, axis=0), axes=(0,))
+        chunk_fft *= fft_window
         chunk_fft_keep = chunk_fft[input_os_discard:-input_os_discard, :]
         assembled_spectrum = chunk_fft_keep.T.reshape((output_fft_length, ))
         #  Rolling ensures that first half channel gets
         #  placed in the correct part of the assembled spectrum.
-        assembled_spectrum = np.roll(assembled_spectrum, -int(input_os_keep/2))
-        if apply_deripple:
-            pass
+        assembled_spectrum = np.roll(assembled_spectrum, -input_os_keep_2)
+        assembled_spectrum *= filter_response
         output_data[output_slice_start:output_slice_stop] = \
             assembled_spectrum[output_overlap_slice]
 
