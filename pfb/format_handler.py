@@ -1,6 +1,7 @@
 import typing
 import functools
 import os
+import logging
 
 import numpy as np
 import psr_formats
@@ -9,6 +10,8 @@ from . import util
 from .pfb_analysis import pfb_analyze, calc_output_tsamp
 from .pfb_synthesis import pfb_synthesize, calc_input_tsamp
 from .rational import Rational
+
+module_logger = logging.getLogger(__name__)
 
 
 class FormatHandler:
@@ -59,6 +62,7 @@ class PSRFormatChannelizer(PSRFormatHandler):
                  os_factor: util.os_factor_type,
                  nchan: int,
                  fir_filter_coeff: util.fir_filter_coeff_type):
+        module_logger.debug("PSRFormatChannelizer.__init__")
         super(PSRFormatChannelizer, self).__init__()
 
         self._os_factor = Rational.from_str(os_factor)
@@ -136,14 +140,17 @@ class PSRFormatSynthesizer(PSRFormatHandler):
 
     def __init__(self,
                  input_overlap: util.overlap_type = None,
-                 *
+                 fft_window: np.ndarray = None,
+                 *,
                  input_fft_length: int,
                  apply_deripple: bool):
+        module_logger.debug("PSRFormatSynthesizer.__init__")
         super(PSRFormatSynthesizer, self).__init__()
 
         self.input_fft_length = input_fft_length
         self.apply_deripple = apply_deripple
         self.input_overlap = input_overlap
+        self.fft_window = fft_window
 
         self._os_factor = None
         self.fir_filter_coeff = None
@@ -198,13 +205,18 @@ class PSRFormatSynthesizer(PSRFormatHandler):
             fir_filter_coeff=self.fir_filter_coeff,
             apply_deripple=self.apply_deripple,
             os_factor=self.os_factor,
+            fft_window=self.fft_window
         )
 
-        expander = functools.partial(np.expand_dims, axis=2)
+        def expander(a):
+            return np.expand_dims(np.expand_dims(a, axis=2), axis=2)
 
         n_pol = input_data.shape[-1]
+        output_data = synthesizer(input_data[:, :, 0])
         output_data = expander(synthesizer(input_data[:, :, 0]))
         for i_pol in range(1, n_pol):
             output_ipol = expander(synthesizer(input_data[:, :, i_pol]))
             output_data = np.concatenate((output_data, output_ipol), axis=2)
+        module_logger.debug((f"PSRFormatSynthesizer.apply: "
+                             f"output_data.shape={output_data.shape}"))
         return output_data

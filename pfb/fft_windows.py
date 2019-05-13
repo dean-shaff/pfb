@@ -33,8 +33,8 @@ def tukey_window(fft_length, overlap):
                          f"overlap={overlap}"))
     window = np.ones((fft_length, 1))
     if overlap > 0:
-        hann_portion = scipy.signal.hanning(2*overlap)
-        window[:overlap] = hann_portion[:overlap]
-        window[:-overlap] = hann_portion[:-overlap]
+        hann_portion = scipy.signal.hann(2*overlap)
+        window[:overlap, 0] = hann_portion[:overlap]
+        window[-overlap:, 0] = hann_portion[-overlap:]
 
     return window

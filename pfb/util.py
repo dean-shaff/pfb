@@ -79,6 +79,7 @@ def filter_coeff_to_str(filter_coeff: np.ndarray) -> typing.List[str]:
     Returns:
         list: a list of strings
     """
+    module_logger.debug(f"filter_coeff_to_str: filter_coeff={filter_coeff}")
     filter_coeff_as_ascii = ["{:.6E}".format(n) for n in filter_coeff]
     return filter_coeff_as_ascii
 
@@ -88,8 +89,12 @@ def str_to_filter_coeff(filter_coeff_str: str, delimiter: str = ",") -> np.ndarr
     Given some filter coefficients, represented as a string of ascii numbers,
     create a numpy array.
     """
+    module_logger.debug((f"str_to_filter_coeff: "
+                         f"filter_coeff_str={filter_coeff_str}, "
+                         f"delimiter={delimiter}"))
     filter_coeff = [float(s) for s in filter_coeff_str.split(delimiter)]
-    return np.ndarray(filter_coeff)
+    module_logger.debug(f"str_to_filter_coeff: filter_coeff={filter_coeff}")
+    return np.asarray(filter_coeff)
 
 
 # def add_fir_data_to_existing_file(
