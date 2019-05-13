@@ -103,9 +103,12 @@ def pfb_synthesize(input_data: np.ndarray,
     module_logger.debug(f"pfb_synthesize: input_os_discard={input_os_discard}")
     module_logger.debug(f"pfb_synthesize: input_overlap={input_overlap}")
     module_logger.debug(f"pfb_synthesize: input_data.dtype={input_data.dtype}")
-    module_logger.debug(f"pfb_synthesize: output_data.dtype={output_data.dtype}")
-    module_logger.debug(f"pfb_synthesize: filter_response.dtype={filter_response.dtype}")
-    module_logger.debug(f"pfb_synthesize: fft_window.dtype={fft_window.dtype}")
+    module_logger.debug(
+        f"pfb_synthesize: output_data.dtype={output_data.dtype}")
+    module_logger.debug(
+        f"pfb_synthesize: filter_response.dtype={filter_response.dtype}")
+    module_logger.debug(
+        f"pfb_synthesize: fft_window.dtype={fft_window.dtype}")
 
     for idx in range(nblocks):
         input_slice_start = idx*input_keep

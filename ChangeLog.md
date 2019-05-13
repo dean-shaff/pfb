@@ -47,3 +47,7 @@ test data.
 chunks.
 - `pfb_synthesis.pfb_synthesize` can use overlap discard, derippling, and
 FFT windows. (not yet tested.)
+
+### v0.6.0
+
+- Added scripts for channelizing and synthesizing from the command line. 
