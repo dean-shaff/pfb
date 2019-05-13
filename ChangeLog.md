@@ -38,3 +38,12 @@ subclass of `format_handler.FormatHandler` to load in real DADA data.
 to channelized file
 - `format_handler.PSRFormatSynthesizer` also copies `UTC_START` from input
 to output file.
+
+### v0.5.2
+
+- `pfb_synthesis.pfb_synthesize` is now set up to be tested against real Matlab
+test data.
+- `pfb_synthesis.pfb_synthesize` works for streaming data in addition to single
+chunks.
+- `pfb_synthesis.pfb_synthesize` can use overlap discard, derippling, and
+FFT windows. (not yet tested.)
