@@ -12,12 +12,16 @@ from pfb.rational import Rational
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 data_dir = os.path.join(current_dir, "test_data")
+config_dir = os.path.join(current_dir, "test_data")
+
+data_dir = ("/home/SWIN/dshaff/mnt/ozstar/projects/"
+            "PST_Matlab_dspsr_PFB_inversion_comparison/data")
+
+config_dir = ("/home/SWIN/dshaff/mnt/ozstar/projects/"
+              "PST_Matlab_dspsr_PFB_inversion_comparison/config")
 
 fir_file_path = os.path.join(
-    data_dir, "Prototype_FIR.4-3.8.80.mat")
-
-# data_dir = ("/home/SWIN/dshaff/mnt/ozstar/projects/"
-#             "PST_Matlab_dspsr_PFB_inversion_comparison/data")
+    config_dir, "Prototype_FIR.4-3.8.32.mat")
 
 input_file_paths = [os.path.join(data_dir, file_name) for file_name in
                     ["complex_sinusoid.dump",

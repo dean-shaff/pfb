@@ -15,19 +15,22 @@ data_dir = os.path.join(current_dir, "test_data")
 fir_file_path = os.path.join(
     data_dir, "Prototype_FIR.4-3.8.80.mat")
 
-# data_dir = ("/home/SWIN/dshaff/mnt/ozstar/projects/"
-#             "PST_Matlab_dspsr_PFB_inversion_comparison/data")
+data_dir = ("/home/SWIN/dshaff/mnt/ozstar/projects/"
+            "PST_Matlab_dspsr_PFB_inversion_comparison/data")
 
 
-input_file_paths = [os.path.join(data_dir, file_name) for file_name in
-                    ["polyphase_analysis.complex_sinusoid.dump",
-                     "polyphase_analysis.time_domain_impulse.dump"]]
+source_file_names = [
+    "complex_sinusoid.deripple_0.overlap_32.window_no_window.dump",
+    "time_domain_impulse.deripple_0.overlap_32.window_no_window.dump"
+]
 
-matlab_file_paths = [os.path.join(data_dir, file_name) for file_name in
-                     ["polyphase_synthesis_alt.complex_sinusoid.dump",
-                      "polyphase_synthesis_alt.time_domain_impulse.dump"]]
+input_file_paths = [
+    os.path.join(data_dir, "polyphase_analysis."+file_name)
+    for file_name in source_file_names]
 
-nchan = 8
+matlab_file_paths = [
+    os.path.join(data_dir, "polyphase_synthesis_alt."+file_name)
+    for file_name in source_file_names]
 
 
 class TestPFBSynthesisValidation(unittest.TestCase):
@@ -36,10 +39,12 @@ class TestPFBSynthesisValidation(unittest.TestCase):
     """
 
     def test_vs_matlab(self):
+        # fft_window = fft_windows.tukey_window(1024, 32)
+        fft_window = fft_windows.no_window(1024)
         synthesizer = PSRFormatSynthesizer(
             input_overlap=32,
-            fft_window=fft_windows.tukey_window(1024, 32),
-            apply_deripple=True,
+            fft_window=fft_window,
+            apply_deripple=False,
             input_fft_length=1024
         )
         for input_file_path, matlab_file_path in zip(input_file_paths,
@@ -52,18 +57,22 @@ class TestPFBSynthesisValidation(unittest.TestCase):
                 output_dir=data_dir,
                 output_file_name=f"pfb_synthesis.{input_file_name}",
             )
+            self.assertTrue(output_file.data.shape == matlab_file.data.shape)
 
             allclose = np.allclose(
                 matlab_file.data.flatten(),
                 output_file.data.flatten(),
-                atol=1e-5
+                atol=1e-6
             )
 
             if not allclose:
                 self._detailed_comparison(matlab_file, output_file)
                 plt.show()
+            else:
+                print((f"pfb_synthesis produces same "
+                       f"output as {matlab_file_path}"))
 
-            self.assertTrue(allclose)
+            # self.assertTrue(allclose)
 
     def _plot_input_data(self, input_file):
 
@@ -73,8 +82,11 @@ class TestPFBSynthesisValidation(unittest.TestCase):
         axes.set_title('Input data')
 
     def _detailed_comparison(self, expected_file, test_file):
+        nchan = expected_file.data.shape[1]
 
         fig, axes = plt.subplots(nchan, 6)
+        if axes.ndim == 1:
+            axes = np.expand_dims(axes, axis=0)
 
         z1 = np.real
         z2 = np.imag
@@ -87,12 +99,10 @@ class TestPFBSynthesisValidation(unittest.TestCase):
         axes[0, 4].set_title('Test complex component 2')
         axes[0, 5].set_title('Diff complex component 2')
 
-        print(expected_file.data.shape)
-        print(test_file.data.shape)
-
         for ichan in range(nchan):
             e_ichan = expected_file.data[:, ichan, 0][:]
             t_ichan = test_file.data[:, ichan, 0][:]
+            # print(np.argmax(e_ichan), np.argmax(t_ichan))
             axes[ichan, 0].plot(z1(e_ichan))
             axes[ichan, 1].plot(z1(t_ichan))
             axes[ichan, 2].plot(np.abs(z1(t_ichan) - z1(e_ichan)))
@@ -102,7 +112,8 @@ class TestPFBSynthesisValidation(unittest.TestCase):
             axes[ichan, 5].plot(np.abs(z2(t_ichan) - z2(e_ichan)))
 
             for i in range(6):
-                # axes[ichan, i].set_xlim([0, 100])
+                axes[ichan, i].set_xlim([4000, 8000])
+                axes[ichan, i].set_yscale("log")
                 axes[ichan, i].grid(True)
 
 
