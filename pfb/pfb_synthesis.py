@@ -79,14 +79,12 @@ def pfb_synthesize(input_data: np.ndarray,
     filter_response = np.ones(output_fft_length,
                               dtype=output_float_dtype)
     if apply_deripple:
+        print(fir_filter_coeff.dtype)
         h = np.abs(scipy.signal.freqz(
             fir_filter_coeff.flatten(), 1, filter_response_len)[1])
-        h = h[:input_os_keep_2].astype(output_float_dtype)
-        intra_channel_response = np.append(h[::-1], h)
-        # import matplotlib.pyplot as plt
-        # fig, ax = plt.subplots(1, 1)
-        # ax.plot(1/intra_channel_response)
-        # plt.show()
+        h = h[:input_os_keep_2+1].astype(output_float_dtype)
+        intra_channel_response = np.append(h[1:][::-1], h[:input_os_keep_2])
+        # intra_channel_response = np.append(h, h[::-1])
         inter_channel_response = np.tile(intra_channel_response, nchan)
         inter_channel_response = np.roll(
             inter_channel_response, -input_os_keep_2)

@@ -51,4 +51,23 @@ FFT windows. (not yet tested.)
 ### v0.6.0
 
 - Added scripts for channelizing and synthesizing from the command line.
-- Added some additional debug messages. 
+- Added some additional debug messages.
+- Fixed issue where there wasn't 100% correspondance between matlab model
+and Python PFB synthesis when applying derippling. The issue is sort of subtle,
+but I can summarize with the following snippet:
+
+```python
+# before
+>>> filt = np.arange(11)
+>>> filt_wrong = np.append(filt[::-1], filt[:10])
+>>> filt_correct = np.append(filt[1:][::-1], filt[:10])
+>>> filt_wrong
+array([10,  9,  8,  7,  6,  5,  4,  3,  2,  1,  0,  0,  1,  2,  3,  4,  5,
+        6,  7,  8,  9, 10])
+>>> filt_right
+array([10,  9,  8,  7,  6,  5,  4,  3,  2,  1,  0,  1,  2,  3,  4,  5,  6,
+        7,  8,  9])
+```
+
+The idea here is that there is no repeated sample at the border between the
+two `append`ed chunks.
