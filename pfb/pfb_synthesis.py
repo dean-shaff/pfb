@@ -109,6 +109,8 @@ def pfb_synthesize(input_data: np.ndarray,
         f"pfb_synthesize: filter_response.dtype={filter_response.dtype}")
     module_logger.debug(
         f"pfb_synthesize: fft_window.dtype={fft_window.dtype}")
+    module_logger.debug(
+        f"pfb_synthesize: nblocks={nblocks}")
 
     for idx in range(nblocks):
         input_slice_start = idx*input_keep

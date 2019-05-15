@@ -84,7 +84,10 @@ def filter_coeff_to_str(filter_coeff: np.ndarray) -> typing.List[str]:
     return filter_coeff_as_ascii
 
 
-def str_to_filter_coeff(filter_coeff_str: str, delimiter: str = ",") -> np.ndarray:
+def str_to_filter_coeff(
+    filter_coeff_str: str,
+    delimiter: str = ","
+) -> np.ndarray:
     """
     Given some filter coefficients, represented as a string of ascii numbers,
     create a numpy array.

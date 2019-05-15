@@ -2,16 +2,17 @@ import os
 
 import numpy as np
 import scipy.signal
+from psr_formats import DADAFile
 
-from src.pfb import util
+from pfb import util
 
 cur_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(cur_dir)
-test_dir = os.path.join(parent_dir, "test")
+test_dir = os.path.join(parent_dir, "test", "test_data")
 
 dada_file_name = "fir.{}.dada"
 
-fir_coeff_file_path = os.path.join(test_dir, "Prototype_FIR.mat")
+fir_coeff_file_path = os.path.join(test_dir, "Prototype_FIR.4-3.8.80.mat")
 
 
 def freqz(a, N):
@@ -21,16 +22,14 @@ def freqz(a, N):
 
 def main():
     N = 1024
-    _, fir_coeff = util.load_matlab_filter_coef(fir_coeff_file_path)
+    _, fir_coeff = util.load_matlab_filter_coeff(fir_coeff_file_path)
 
     w, h = scipy.signal.freqz(fir_coeff, 1, worN=N)
-    h_ = freqz(fir_coeff, N)
+    # h_ = freqz(fir_coeff, N)
 
-    print(np.allclose(h, h_))
-
-    data = np.zeros((h.shape[0], 2), dtype=np.float32)
-    data[:, 0] = h.real
-    data[:, 1] = h.imag
+    data = np.zeros((h.shape[0], 1, 2), dtype=np.float32)
+    data[:, 0, 0] = h.real
+    data[:, 0, 1] = h.imag
 
     # for i in range(100):
     #     print(data[i, :])
@@ -62,14 +61,11 @@ def main():
         "COEFF": fir_coeff,
         "NCHAN_PFB": 1
     }]
-
-    header = util.add_filter_info_to_header(header, fir_info)
-
-    util.dump_dada_file(
-        dada_file_path,
-        header,
-        data.flatten()
-    )
+    output_file = DADAFile(dada_file_path)
+    output_file.header = header
+    output_file.header.update(util.filter_info_to_dict(fir_info))
+    output_file.data = data
+    output_file.dump_data()
 
 
 if __name__ == "__main__":

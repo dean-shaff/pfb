@@ -203,6 +203,8 @@ class PSRFormatSynthesizer(PSRFormatHandler):
         return output_file
 
     def apply(self, input_data: np.ndarray):
+        module_logger.debug((f"PSRFormatSynthesizer.apply: "
+                             f"input_data.shape={input_data.shape}"))
 
         synthesizer = pfb_synthesize(
             input_fft_length=self.input_fft_length,
