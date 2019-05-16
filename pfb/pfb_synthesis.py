@@ -83,8 +83,12 @@ def pfb_synthesize(input_data: np.ndarray,
             input_overlap = input_overlap(input_fft_length)
 
     if fft_window is None:
-        fft_window = np.ones((input_fft_length, 1))
+        fft_window = np.ones((input_fft_length, 1), dtype=output_float_dtype)
     fft_window = fft_window.astype(output_float_dtype)
+    # import matplotlib.pyplot as plt
+    # fig, ax = plt.subplots(1, 1)
+    # ax.plot(fft_window)
+    # plt.show()
 
     output_overlap = os_factor.normalize(input_overlap)*nchan
     output_overlap_slice = slice(0, None)
@@ -95,6 +99,9 @@ def pfb_synthesize(input_data: np.ndarray,
     input_os_keep_2 = int(input_os_keep/2)
     input_os_discard = int((input_fft_length - input_os_keep)/2)
     input_keep = input_fft_length - 2*input_overlap
+    input_os_slice = slice(0, None)
+    if input_os_discard != 0:
+        input_os_slice = slice(input_os_discard, -input_os_discard)
 
     output_fft_length = os_factor.normalize(input_fft_length)*nchan
     output_keep = output_fft_length - 2*output_overlap
@@ -134,11 +141,11 @@ def pfb_synthesize(input_data: np.ndarray,
         input_slice_stop = input_slice_start + input_fft_length
         output_slice_start = idx*output_keep
         output_slice_stop = output_slice_start + output_keep
-
-        chunk = input_data[input_slice_start:input_slice_stop, :]
+        chunk = input_data[input_slice_start:input_slice_stop, :].copy()
+        chunk *= fft_window
         chunk_fft = np.fft.fftshift(scipy.fftpack.fft(chunk, axis=0))
-        chunk_fft *= fft_window
-        chunk_fft_keep = chunk_fft[input_os_discard:-input_os_discard, :]
+
+        chunk_fft_keep = chunk_fft[input_os_slice, :]
         assembled_spectrum = chunk_fft_keep.T.reshape(output_fft_length)
         #  Rolling ensures that first half channel gets
         #  placed in the correct part of the assembled spectrum.

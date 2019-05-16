@@ -7,7 +7,8 @@ import scipy.signal
 __all__ = [
     "no_window",
     "top_hat_window",
-    "tukey_window"
+    "tukey_window",
+    "hann_window"
 ]
 
 module_logger = logging.getLogger(__name__)
@@ -38,3 +39,8 @@ def tukey_window(fft_length, overlap):
         window[-overlap:, 0] = hann_portion[-overlap:]
 
     return window
+
+
+def hann_window(fft_length):
+    module_logger.debug(f"hann_window: fft_length={fft_length}")
+    return scipy.signal.hann(fft_length).reshape((-1, 1))

@@ -74,3 +74,12 @@ two `append`ed chunks.
 
 - Small refactor in `pfb_synthesis` in order to separate out creation of deripple
 response.
+
+### 0.7.0
+
+- Fixed bug in `pfb_synthesize` where we couldn't apply FFT window properly.
+This had to do with the fact that we were applying changes to the original
+input data when operating on chunks. Once I made a copy, the issue resolved
+itself.
+- `pfb_synthesize` is fully compliant with the Matlab specification.
+- Added Hann FFT window.

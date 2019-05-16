@@ -219,7 +219,6 @@ class PSRFormatSynthesizer(PSRFormatHandler):
             return np.expand_dims(np.expand_dims(a, axis=2), axis=2)
 
         n_pol = input_data.shape[-1]
-        output_data = synthesizer(input_data[:, :, 0])
         output_data = expander(synthesizer(input_data[:, :, 0]))
         for i_pol in range(1, n_pol):
             output_ipol = expander(synthesizer(input_data[:, :, i_pol]))
