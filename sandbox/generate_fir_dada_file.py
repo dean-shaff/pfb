@@ -1,41 +1,40 @@
 import os
 
 import numpy as np
-import scipy.signal
 from psr_formats import DADAFile
 
-from pfb import util
+from pfb import util, pfb_synthesis, rational
 
 cur_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(cur_dir)
 test_dir = os.path.join(parent_dir, "test", "test_data")
+output_dir = "/home/SWIN/dshaff/ska/test_data"
 
 dada_file_name = "fir.{}.dada"
 
 fir_coeff_file_path = os.path.join(test_dir, "Prototype_FIR.4-3.8.80.mat")
-
-
-def freqz(a, N):
-    f = np.fft.rfft(a, 2*N)
-    return f[:N]
+os_factor = "4/3"
+nchan = 8
+N = 128
 
 
 def main():
-    N = 1024
     _, fir_coeff = util.load_matlab_filter_coeff(fir_coeff_file_path)
 
-    w, h = scipy.signal.freqz(fir_coeff, 1, worN=N)
-    # h_ = freqz(fir_coeff, N)
+    N_normalized = rational.Rational.from_str(os_factor).normalize(N)
 
-    data = np.zeros((h.shape[0], 1, 2), dtype=np.float32)
-    data[:, 0, 0] = h.real
-    data[:, 0, 1] = h.imag
+    deripple_response = pfb_synthesis._multi_channel_deripple_response(
+        nchan, N_normalized, fir_coeff, pfb_dc_chan=True, dtype=np.float32
+    )
 
-    # for i in range(100):
-    #     print(data[i, :])
+
+    data = np.zeros((deripple_response.shape[0], 1, 1), dtype=np.complex64)
+    data[:, 0, 0] = (
+        deripple_response +
+        1j*np.zeros(deripple_response.shape[0], dtype=np.float32))
 
     dada_file_path = os.path.join(
-        parent_dir, dada_file_name.format(data.shape[0]))
+        output_dir, dada_file_name.format(data.shape[0]))
 
     header = {
         "NCHAN": 1,
@@ -52,11 +51,13 @@ def main():
         "SOURCE": "J1644-4559",
         "TSAMP": 0.175,
         "UTC_START": "2019-02-06-04:57:23",
-        "OBS_OFFSET": "0"
+        "OBS_OFFSET": "0",
+        "OS_FACTOR": os_factor,
+        "PFB_DC_CHAN": "1"
     }
 
     fir_info = [{
-        "OVERSAMP": "1/1",
+        "OVERSAMP": os_factor,
         "NTAP": len(fir_coeff),
         "COEFF": fir_coeff,
         "NCHAN_PFB": 1

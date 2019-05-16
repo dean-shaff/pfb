@@ -16,6 +16,32 @@ __all__ = [
 ]
 
 
+def _multi_channel_deripple_response(
+    nchan: int,
+    input_os_keep: int,
+    fir_filter_coeff: np.ndarray,
+    pfb_dc_chan: bool = True,
+    dtype: np.dtype = np.dtype('float32')
+) -> np.ndarray:
+    """
+    Create a deripple response that is applied to the assembled, rolled
+    spectrum before the last inverse FFT is applied.
+    """
+    input_os_keep_2 = int(input_os_keep / 2)
+    filter_response_len = nchan*input_os_keep_2
+    h = np.abs(scipy.signal.freqz(
+        fir_filter_coeff.flatten(), 1, filter_response_len)[1])
+    # h = h[:input_os_keep_2].astype(dtype)
+    # intra_channel_response = np.append(h[::-1], h)
+    h = h[:input_os_keep_2+1].astype(dtype)
+    intra_channel_response = np.append(h[1:][::-1], h[:input_os_keep_2])
+    inter_channel_response = np.tile(intra_channel_response, nchan)
+    if pfb_dc_chan:
+        inter_channel_response = np.roll(
+            inter_channel_response, -input_os_keep_2)
+    return inter_channel_response
+
+
 @partialize.partialize
 def calc_input_tsamp(output_tsamp: float,
                      input_ndim: int = 2,
@@ -75,20 +101,13 @@ def pfb_synthesize(input_data: np.ndarray,
 
     nblocks = int((ndat - 2*input_overlap) / input_keep)
 
-    filter_response_len = nchan*input_os_keep_2
     filter_response = np.ones(output_fft_length,
                               dtype=output_float_dtype)
     if apply_deripple:
-        print(fir_filter_coeff.dtype)
-        h = np.abs(scipy.signal.freqz(
-            fir_filter_coeff.flatten(), 1, filter_response_len)[1])
-        h = h[:input_os_keep_2+1].astype(output_float_dtype)
-        intra_channel_response = np.append(h[1:][::-1], h[:input_os_keep_2])
-        # intra_channel_response = np.append(h, h[::-1])
-        inter_channel_response = np.tile(intra_channel_response, nchan)
-        inter_channel_response = np.roll(
-            inter_channel_response, -input_os_keep_2)
-        filter_response /= inter_channel_response
+        filter_response /= _multi_channel_deripple_response(
+            nchan, input_os_keep, fir_filter_coeff,
+            pfb_dc_chan=True, dtype=output_float_dtype
+        )
 
     output_data = np.zeros((output_keep*nblocks), dtype=output_dtype)
 

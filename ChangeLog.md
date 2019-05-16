@@ -71,3 +71,6 @@ array([10,  9,  8,  7,  6,  5,  4,  3,  2,  1,  0,  1,  2,  3,  4,  5,  6,
 
 The idea here is that there is no repeated sample at the border between the
 two `append`ed chunks.
+
+- Small refactor in `pfb_synthesis` in order to separate out creation of deripple
+response.
