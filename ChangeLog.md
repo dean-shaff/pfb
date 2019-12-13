@@ -83,3 +83,7 @@ input data when operating on chunks. Once I made a copy, the issue resolved
 itself.
 - `pfb_synthesize` is fully compliant with the Matlab specification.
 - Added Hann FFT window.
+
+### 0.8.0
+
+- Added option to use inverse FFT with `pfb_analyze`.

@@ -63,6 +63,7 @@ class PSRFormatHandler(FormatHandler):
 class PSRFormatChannelizer(PSRFormatHandler):
 
     def __init__(self,
+                 use_ifft: bool = False,
                  *,
                  os_factor: util.os_factor_type,
                  nchan: int,
@@ -76,6 +77,7 @@ class PSRFormatChannelizer(PSRFormatHandler):
             fir_filter_coeff = util.load_matlab_filter_coeff(
                 fir_filter_coeff)[1]
         self._fir_filter_coeff = fir_filter_coeff
+        self.use_ifft = use_ifft
 
     @property
     def fir_filter_coeff(self):
@@ -126,6 +128,7 @@ class PSRFormatChannelizer(PSRFormatHandler):
 
     def apply(self, input_data: np.ndarray):
         channelizer = pfb_analyze(
+            use_ifft=self.use_ifft,
             fir_filter_coeff=self.fir_filter_coeff,
             os_factor=self.os_factor,
             nchan=self.nchan

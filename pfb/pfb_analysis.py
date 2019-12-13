@@ -125,6 +125,7 @@ def calc_output_tsamp(input_tsamp: float,
 
 @partialize.partialize
 def pfb_analyze(input_data: np.ndarray,
+                use_ifft: bool = False,
                 *,
                 fir_filter_coeff: np.ndarray,
                 nchan: int,
@@ -177,8 +178,12 @@ def pfb_analyze(input_data: np.ndarray,
         (f"pfb_analyze: "
          f"Call to filter took {time.time()-t0:.4f} seconds"))
 
-    output_filtered_fft = nchan*scipy.fftpack.fft(
-        output_filtered, n=nchan, axis=1)
+    if use_ifft:
+        output_filtered_fft = nchan**2*scipy.fftpack.ifft(
+            output_filtered, n=nchan, axis=1)
+    else:
+        output_filtered_fft = nchan*scipy.fftpack.fft(
+            output_filtered, n=nchan, axis=1)
 
     module_logger.debug(
         (f"pfb_analyze: "
