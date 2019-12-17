@@ -65,7 +65,8 @@ files.
 
 ```
 python -m pfb.channelize -i <path-to-dada-file.dump> -c 256 -os 4/3
-python -m pfb.channelize -i <path-to-dada-file.dump> --channels 256 --os_factor 4/3
+python -m pfb.channelize -i <path-to-dada-file.dump> --nchan 256 --os_factor 4/3
+poetry run python -m pfb.channelize -i ~/ska/test_data/simulated_pulsar.noise_0.0.nseries_3.ndim_2.dump -c 8 -od ~/ska/test_data/ -f ~/mnt/ozstar/projects/PST_Matlab_dspsr_PFB_inversion_comparison/config/Prototype_FIR.4-3.8.80.mat -v
 ```
 
 ```
