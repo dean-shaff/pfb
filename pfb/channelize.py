@@ -35,6 +35,12 @@ def create_parser():
     parser.add_argument("-od", "--output_dir",
                         dest="output_dir", default="./", type=str)
 
+    parser.add_argument("--use-ifft",
+                        dest="use_ifft", action="store_true")
+
+    parser.add_argument("--pfb-dc-chan",
+                        dest="pfb_dc_chan", action="store_true")
+
     return parser
 
 
@@ -49,14 +55,19 @@ if __name__ == "__main__":
     channelizer = PSRFormatChannelizer(
         os_factor=parsed.os_factor,
         nchan=parsed.nchan,
-        fir_filter_coeff=parsed.fir_file_path
+        fir_filter_coeff=parsed.fir_file_path,
+        use_ifft=parsed.use_ifft
     )
 
     output_file_name = parsed.output_file_name
     if output_file_name == "":
         output_file_name = ("channelized." +
                             os.path.basename(parsed.input_file_path))
+    dada_file = psr_formats.DADAFile(parsed.input_file_path)
 
-    channelizer(psr_formats.DADAFile(parsed.input_file_path),
+    if parsed.pfb_dc_chan:
+        dada_file["PFB_DC_CHAN"] = "1"
+
+    channelizer(dada_file,
                 output_dir=parsed.output_dir,
                 output_file_name=output_file_name)

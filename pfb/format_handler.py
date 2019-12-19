@@ -141,6 +141,8 @@ class PSRFormatChannelizer(PSRFormatHandler):
         for i_pol in range(1, n_pol):
             output_ipol = expander(channelizer(input_data[:, 0, i_pol]))
             output_data = np.concatenate((output_data, output_ipol), axis=2)
+        # we have to reverse for the purposes of DSPSR
+        output_data = output_data[:, ::-1, :]
         return output_data
 
 
