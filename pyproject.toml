@@ -9,7 +9,7 @@ python = "^3.6"
 numpy = "^1.16"
 scipy = "^1.2"
 numba = "^0.43"
-psr-formats = {git = "git@github.com:dean-shaff/psr-formats.git"}
+psr-formats = {git = "git@gitlab.com:dean-shaff/psr-formats.git"}
 partialize = {git = "git@github.com:dean-shaff/partialize.git"}
 comparator = {git = "git@github.com:dean-shaff/comparator.git"}
 
