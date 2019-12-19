@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pfb"
-version = "0.8.0"
+version = "0.8.1"
 description = ""
 authors = ["Dean Shaff <dshaff@swin.edu.au>"]
 

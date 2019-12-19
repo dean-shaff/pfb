@@ -87,3 +87,7 @@ itself.
 ### 0.8.0
 
 - Added option to use inverse FFT with `pfb_analyze`.
+
+### 0.8.1
+
+- Update format_handler to deal with new `use_ifft` option.
